@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FORRALITAS · Pantalla del galpón</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+
+    /* ==========================================
+       CONFIGURACIÓN RÁPIDA
+       Cambiá este número para que el aviso se
+       quede en pantalla más o menos tiempo.
+    ========================================== */
+    :root{
+        --duracion-aviso: 120; /* segundos que se muestra cada venta */
+        --dorado: #d9a441;
+        --dorado-suave: #f0c874;
+        --verde: #2e7d32;
+        --verde-claro: #4caf50;
+        --fondo: #0c1811;
+        --fondo-panel: #142a1c;
+        --texto: #f5f1e6;
+        --texto-tenue: #93a89a;
+    }
+
+    *{ margin:0; padding:0; box-sizing:border-box; }
+
+    html, body{
+        width:100%;
+        height:100%;
+        overflow:hidden;
+        background:var(--fondo);
+        font-family:"Inter", sans-serif;
+        color:var(--texto);
+    }
+
+    body{
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        position:relative;
+        background:
+            radial-gradient(circle at 15% 15%, rgba(46,125,50,.18), transparent 45%),
+            radial-gradient(circle at 85% 85%, rgba(217,164,65,.10), transparent 45%),
+            var(--fondo);
+    }
+
+    /* ---------- Encabezado fijo ---------- */
+
+    .marca{
+        position:fixed;
+        top:36px;
+        left:50px;
+        display:flex;
+        align-items:center;
+        gap:16px;
+        opacity:.85;
+    }
+
+    .marca .punto{
+        width:14px;
+        height:14px;
+        border-radius:50%;
+        background:var(--verde-claro);
+        box-shadow:0 0 14px var(--verde-claro);
+    }
+
+    .marca span{
+        font-family:"Oswald", sans-serif;
+        font-weight:700;
+        font-size:26px;
+        letter-spacing:3px;
+        text-transform:uppercase;
+    }
+
+    .reloj{
+        position:fixed;
+        top:40px;
+        right:50px;
+        font-size:22px;
+        color:var(--texto-tenue);
+        font-variant-numeric:tabular-nums;
+    }
+
+    /* ---------- Estado: en espera ---------- */
+
+    #pantallaEspera{
+        text-align:center;
+        transition:opacity .6s ease;
+    }
+
+    #pantallaEspera .icono{
+        font-size:110px;
+        animation:respirar 3.5s ease-in-out infinite;
+    }
+
+    @keyframes respirar{
+        0%, 100%{ transform:scale(1); opacity:.75; }
+        50%{ transform:scale(1.08); opacity:1; }
+    }
+
+    #pantallaEspera h1{
+        font-family:"Oswald", sans-serif;
+        font-weight:500;
+        font-size:44px;
+        letter-spacing:1px;
+        color:var(--texto-tenue);
+        margin-top:28px;
+    }
+
+    #pantallaEspera p{
+        margin-top:10px;
+        font-size:22px;
+        color:var(--texto-tenue);
+        opacity:.7;
+    }
+
+    /* ---------- Estado: aviso de venta ---------- */
+
+    #pantallaAviso{
+        position:fixed;
+        inset:0;
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        opacity:0;
+        pointer-events:none;
+        transform:scale(.94);
+        transition:opacity .45s ease, transform .45s ease;
+    }
+
+    #pantallaAviso.activo{
+        opacity:1;
+        pointer-events:auto;
+        transform:scale(1);
+    }
+
+    .etiquetaVenta{
+        font-family:"Oswald", sans-serif;
+        font-size:30px;
+        letter-spacing:6px;
+        text-transform:uppercase;
+        color:var(--dorado-suave);
+        margin-bottom:6px;
+    }
+
+    .numeroVenta{
+        font-family:"Oswald", sans-serif;
+        font-weight:700;
+        font-size:min(22vw, 260px);
+        line-height:.95;
+        color:var(--texto);
+        text-shadow:0 0 60px rgba(217,164,65,.35);
+    }
+
+    .listaItems{
+        list-style:none;
+        margin-top:46px;
+        display:flex;
+        flex-direction:column;
+        gap:18px;
+        max-width:80vw;
+    }
+
+    .listaItems li{
+        display:flex;
+        align-items:center;
+        gap:22px;
+        background:var(--fondo-panel);
+        border:2px solid rgba(217,164,65,.25);
+        border-radius:18px;
+        padding:22px 40px;
+        font-size:38px;
+        font-weight:600;
+        min-width:520px;
+    }
+
+    .listaItems li::before{
+        content:"●";
+        color:var(--verde-claro);
+        font-size:22px;
+    }
+
+    .horaAviso{
+        margin-top:36px;
+        font-size:20px;
+        color:var(--texto-tenue);
+    }
+
+    /* ---------- Barra de tiempo restante ---------- */
+
+    .barraTiempo{
+        position:fixed;
+        bottom:0;
+        left:0;
+        height:10px;
+        width:100%;
+        background:rgba(255,255,255,.06);
+    }
+
+    .barraTiempo .relleno{
+        height:100%;
+        width:100%;
+        background:linear-gradient(90deg, var(--verde), var(--dorado));
+        transform-origin:left;
+    }
+
+    .barraTiempo .relleno.corriendo{
+        animation:vaciar var(--duracion-aviso) linear forwards;
+    }
+
+    @keyframes vaciar{
+        from{ transform:scaleX(1); }
+        to{ transform:scaleX(0); }
+    }
+
+</style>
+</head>
+<body>
+
+    <div class="marca">
+        <div class="punto"></div>
+        <span>Forralitas</span>
+    </div>
+
+    <div class="reloj" id="reloj">--:--</div>
+
+    <div id="pantallaEspera">
+        <div class="icono">🌾</div>
+        <h1>Esperando el próximo pedido…</h1>
+        <p>La próxima venta va a aparecer acá automáticamente.</p>
+    </div>
+
+    <div id="pantallaAviso">
+        <div class="etiquetaVenta">Venta N.º</div>
+        <div class="numeroVenta" id="numeroVenta">—</div>
+        <ul class="listaItems" id="listaItems"></ul>
+        <div class="horaAviso" id="horaAviso"></div>
+    </div>
+
+    <div class="barraTiempo">
+        <div class="relleno" id="relleno"></div>
+    </div>
+
+    <script type="module">
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+        import {
+            getFirestore, doc, onSnapshot
+        } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+        // Mismo proyecto de Firebase que usa la app de la caja.
+        const firebaseConfig = {
+            apiKey: "AIzaSyA3eDUrC8_O3Yo629frSDP4GlNt4-RUfHg",
+            authDomain: "forralitas-3394f.firebaseapp.com",
+            projectId: "forralitas-3394f",
+            storageBucket: "forralitas-3394f.firebasestorage.app",
+            messagingSenderId: "1044717245979",
+            appId: "1:1044717245979:web:c44ab60b923c00fdc54abe"
+        };
+
+        const DURACION_MS = 120 * 1000; // debe coincidir con --duracion-aviso de arriba
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const pantallaEspera = document.getElementById("pantallaEspera");
+        const pantallaAviso = document.getElementById("pantallaAviso");
+        const numeroVenta = document.getElementById("numeroVenta");
+        const listaItems = document.getElementById("listaItems");
+        const horaAviso = document.getElementById("horaAviso");
+        const relleno = document.getElementById("relleno");
+
+        let primerSnapshot = true;
+        let ultimoNumeroVisto = null;
+        let temporizadorOcultar = null;
+
+        // Sonido de aviso (se genera con el navegador, no necesita ningún archivo).
+        function reproducirBeep(){
+            try{
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                [880, 1175].forEach((freq, i) =>{
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = "sine";
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.0001, ctx.currentTime + i * 0.18);
+                    gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + i * 0.18 + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + i * 0.18 + 0.32);
+                    osc.connect(gain).connect(ctx.destination);
+                    osc.start(ctx.currentTime + i * 0.18);
+                    osc.stop(ctx.currentTime + i * 0.18 + 0.35);
+                });
+            }catch(e){ /* si el navegador bloquea audio autoplay, seguimos sin sonido */ }
+        }
+
+        function mostrarAviso(datos){
+
+            numeroVenta.textContent = datos.numero ?? "—";
+
+            listaItems.innerHTML = (datos.items || [])
+                .map(texto => `<li>${texto}</li>`)
+                .join("");
+
+            horaAviso.textContent = datos.hora ? "Registrada a las " + datos.hora : "";
+
+            pantallaEspera.style.opacity = "0";
+            pantallaAviso.classList.add("activo");
+
+            // Reinicia la barra de tiempo restante.
+            relleno.classList.remove("corriendo");
+            void relleno.offsetWidth; // fuerza el reinicio de la animación CSS
+            relleno.classList.add("corriendo");
+
+            reproducirBeep();
+
+            if(temporizadorOcultar) clearTimeout(temporizadorOcultar);
+
+            temporizadorOcultar = setTimeout(ocultarAviso, DURACION_MS);
+
+        }
+
+        function ocultarAviso(){
+
+            pantallaAviso.classList.remove("activo");
+
+            pantallaEspera.style.opacity = "1";
+
+        }
+
+        onSnapshot(
+
+            doc(db, "forralitasDatos", "avisoGalpon"),
+
+            (snap) =>{
+
+                if(!snap.exists()) return;
+
+                const datos = snap.data().datos;
+
+                if(!datos) return;
+
+                if(primerSnapshot){
+
+                    // Al prender la tele no mostramos la última venta vieja,
+                    // solo empezamos a escuchar avisos nuevos a partir de ahora.
+                    primerSnapshot = false;
+
+                    ultimoNumeroVisto = datos.numero;
+
+                    return;
+
+                }
+
+                if(datos.numero === ultimoNumeroVisto) return;
+
+                ultimoNumeroVisto = datos.numero;
+
+                mostrarAviso(datos);
+
+            },
+
+            (error) =>{
+
+                console.error("Error escuchando avisoGalpon:", error);
+
+            }
+
+        );
+
+        // Reloj en la esquina, útil para ver de un vistazo que la pantalla sigue viva.
+        function actualizarReloj(){
+
+            document.getElementById("reloj").textContent =
+                new Date().toLocaleTimeString("es-AR", { hour:"2-digit", minute:"2-digit" });
+
+        }
+
+        actualizarReloj();
+
+        setInterval(actualizarReloj, 15000);
+
+    </script>
+
+</body>
+</html>

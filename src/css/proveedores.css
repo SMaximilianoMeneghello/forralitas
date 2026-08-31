@@ -1,0 +1,57 @@
+/* ==========================================
+   PROVEEDORES
+========================================= */
+
+.tablaProveedores{
+
+    overflow-x:auto;
+
+}
+
+.tablaProveedores table{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+}
+
+.tablaProveedores thead{
+
+    background:var(--verde);
+
+    color:white;
+
+}
+
+.tablaProveedores th{
+
+    padding:16px;
+
+    text-align:center;
+
+}
+
+.tablaProveedores td{
+
+    padding:15px;
+
+    border-bottom:1px solid #ececec;
+
+    text-align:center;
+
+    background:white;
+
+}
+
+.tablaProveedores tbody tr:hover td{
+
+    background:#f5fbf5;
+
+}
+
+.tablaProveedores td:first-child{
+
+    text-align:left;
+
+}

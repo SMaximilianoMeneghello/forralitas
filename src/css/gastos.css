@@ -1,0 +1,187 @@
+/* ==========================================
+   GASTOS
+========================================= */
+
+/* ==========================================
+   BUSCADOR DE GASTOS
+   (fecha desde/hasta + texto libre)
+========================================== */
+
+.gastosBuscador{
+
+    display:flex;
+
+    flex-wrap:wrap;
+
+    align-items:end;
+
+    gap:15px;
+
+    padding:20px;
+
+    margin-bottom:20px;
+
+    background:#fff;
+
+    border-radius:18px;
+
+    border:1px solid rgba(0,0,0,.06);
+
+    box-shadow:0 12px 35px rgba(0,0,0,.05);
+
+}
+
+.gastosBuscador .grupoInput{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:6px;
+
+    margin:0;
+
+}
+
+.gastosBuscador label{
+
+    font-size:.9rem;
+
+    font-weight:700;
+
+    color:#555;
+
+    margin:0;
+
+}
+
+.gastosBuscador input{
+
+    height:48px;
+
+    padding:0 15px;
+
+    border-radius:12px;
+
+    border:2px solid #e5e7eb;
+
+    transition:.25s;
+
+    background:#fafafa;
+
+    font-size:14px;
+
+}
+
+.gastosBuscador input:focus{
+
+    border-color:var(--verde);
+
+    background:#fff;
+
+    outline:none;
+
+    box-shadow:0 0 0 5px rgba(46,125,50,.12);
+
+}
+
+.gastosBuscador .grupoInputBuscarTexto{
+
+    flex:1;
+
+    min-width:220px;
+
+}
+
+.gastosBuscador .grupoInputBuscarTexto input{
+
+    width:100%;
+
+}
+
+.gastosBuscador .btnAgregar{
+
+    height:48px;
+
+    margin-left:auto;
+
+}
+
+@media(max-width:900px){
+
+    .gastosBuscador{
+
+        flex-direction:column;
+
+        align-items:stretch;
+
+    }
+
+    .gastosBuscador input,
+    .gastosBuscador button{
+
+        width:100%;
+
+    }
+
+    .gastosBuscador .btnAgregar{
+
+        margin-left:0;
+
+    }
+
+}
+
+.tablaGastos{
+
+    overflow-x:auto;
+
+}
+
+.tablaGastos table{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+}
+
+.tablaGastos thead{
+
+    background:var(--verde);
+
+    color:white;
+
+}
+
+.tablaGastos th{
+
+    padding:16px;
+
+    text-align:center;
+
+}
+
+.tablaGastos td{
+
+    padding:15px;
+
+    border-bottom:1px solid #ececec;
+
+    text-align:center;
+
+    background:white;
+
+}
+
+.tablaGastos tbody tr:hover td{
+
+    background:#fff8f8;
+
+}
+
+.tablaGastos td:first-child{
+
+    text-align:left;
+
+}

@@ -1,0 +1,136 @@
+/* ==========================================
+   CLIENTES
+========================================= */
+
+.clientesHeader{
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+
+}
+
+.tablaClientes{
+
+    overflow-x: auto;
+
+}
+.btnAgregar{
+
+    background:var(--verde);
+    color:white;
+
+    border:none;
+
+    padding:12px 20px;
+
+    border-radius:10px;
+
+    font-size:15px;
+
+    font-weight:600;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+    box-shadow:var(--sombra);
+
+}
+
+.btnAgregar:hover{
+
+    background:var(--verdeHover);
+
+    transform:translateY(-2px);
+
+}
+.tablaClientes table{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+}
+
+.tablaClientes thead{
+
+    background:var(--verde);
+
+    color:white;
+
+}
+
+.tablaClientes th{
+
+    padding:16px;
+
+    text-align:center;
+
+}
+
+.tablaClientes td{
+
+    padding:15px;
+
+    border-bottom:1px solid #ececec;
+
+    text-align:center;
+
+    background:white;
+
+}
+
+.tablaClientes tbody tr:hover{
+
+    background:#f5fbf5;
+
+}
+
+.tablaClientes tbody tr:hover td{
+
+    background:#f5fbf5;
+
+}
+.btnAccion{
+
+    width:38px;
+
+    height:38px;
+
+    border:none;
+
+    border-radius:10px;
+
+    color:white;
+
+    cursor:pointer;
+
+}
+
+.btnVer{
+
+    background:#43a047;
+
+}
+
+.btnEditar{
+
+    background:#1976d2;
+
+}
+
+.btnBorrar{
+
+    background:#e53935;
+
+}
+
+.btnAccion:hover{
+
+    transform:scale(1.08);
+
+}

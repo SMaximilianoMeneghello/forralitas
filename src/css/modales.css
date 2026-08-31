@@ -1,0 +1,90 @@
+/* ==========================================
+   MODALES
+========================================= */
+
+.modal{
+
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 40, 30, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+    animation: fadeIn 0.18s ease;
+
+}
+
+@keyframes fadeIn{
+
+    from { opacity: 0; }
+    to   { opacity: 1; }
+
+}
+
+.modalContenido{
+
+    background: var(--color-blanco);
+    border-radius: var(--radio);
+    padding: 28px;
+    width: 100%;
+    max-width: 520px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    animation: slideUp 0.22s ease;
+
+}
+
+@keyframes slideUp{
+
+    from { transform: translateY(24px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+
+}
+
+.modalPequeño{
+
+    max-width: 380px;
+
+}
+
+.modalContenido h2{
+
+    font-size: 20px;
+    color: var(--color-primario-osc);
+    margin-bottom: 20px;
+    font-weight: 700;
+
+}
+
+.grupoInput{
+
+    margin-bottom: 16px;
+
+}
+
+.accionesModal{
+
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+
+}
+
+.previewCantidad{
+
+    display: block;
+    margin-top: 8px;
+    color: var(--color-primario);
+    font-size: 13px;
+    font-weight: 600;
+
+}
+.modal.oculto{
+
+    display:none;
+
+}

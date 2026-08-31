@@ -1,0 +1,115 @@
+/* ==========================================
+   REPORTES
+========================================= */
+
+.reportesContenedor{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:22px;
+
+}
+
+.reportesFiltros{
+
+    display:flex;
+
+    flex-wrap:wrap;
+
+    align-items:flex-end;
+
+    gap:15px;
+
+    padding:20px;
+
+    background:#fff;
+
+    border-radius:18px;
+
+    border:1px solid var(--color-borde);
+
+    box-shadow:0 12px 35px rgba(0,0,0,.05);
+
+}
+
+.reportesFiltros .grupoInput{
+
+    margin-bottom:0;
+
+}
+
+.reportesFiltros .grupoInput input,
+.reportesFiltros .grupoInput select{
+
+    width:200px;
+
+    height:46px;
+
+    margin:0;
+
+    padding:0 14px;
+
+    border:2px solid #e5e7eb;
+
+    border-radius:12px;
+
+    background:#fafafa;
+
+}
+
+.reportesFiltros .grupoInput input:focus,
+.reportesFiltros .grupoInput select:focus{
+
+    border-color:var(--verde);
+
+    background:white;
+
+    box-shadow:0 0 0 5px rgba(46,125,50,.12);
+
+    outline:none;
+
+}
+
+.reportesGrid{
+
+    display:grid;
+
+    grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+
+    gap:20px;
+
+}
+
+.reportesGrid .cardMetrica{
+
+    opacity:1;
+
+    animation:none;
+
+}
+
+.dashboardResumen .ventaDashboard{
+
+    justify-content:space-between;
+
+}
+
+@media(max-width:900px){
+
+    .reportesFiltros{
+
+        flex-direction:column;
+
+        align-items:stretch;
+
+    }
+
+    .reportesFiltros .grupoInput input{
+
+        width:100%;
+
+    }
+
+}

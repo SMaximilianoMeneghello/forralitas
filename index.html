@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <meta name="theme-color" content="#2e7d32">
+
+    <title>FORRALITAS APP</title>
+
+    <!-- CSS GENERAL -->
+    <link rel="stylesheet" href="./src/css/style.css">
+
+    <!-- MODULOS -->
+    <link rel="stylesheet" href="./src/css/dashboard.css">
+    <link rel="stylesheet" href="./src/css/productos.css">
+    <link rel="stylesheet" href="./src/css/ventas.css">
+    <link rel="stylesheet" href="./src/css/clientes.css">
+    <link rel="stylesheet" href="./src/css/clienteDetalle.css">
+    <link rel="stylesheet" href="./src/css/preciosClientes.css">
+    <link rel="stylesheet" href="./src/css/proveedores.css">
+    <link rel="stylesheet" href="./src/css/gastos.css">
+    <link rel="stylesheet" href="./src/css/historial.css">
+    <link rel="stylesheet" href="./src/css/reportes.css">
+    <link rel="stylesheet" href="./src/css/configuracion.css">
+
+    <!-- MODALES -->
+    <link rel="stylesheet" href="./src/css/modales.css">
+
+    <!-- LOGIN -->
+    <link rel="stylesheet" href="./src/css/login.css">
+
+</head>
+
+<body>
+
+<!-- ===================================== -->
+<!-- PANTALLA DE LOGIN -->
+<!-- ===================================== -->
+
+<div id="pantallaLogin">
+
+    <form id="formLogin" class="loginCaja">
+
+        <div class="loginLogo">FORRALITAS</div>
+
+        <div class="loginSub">Iniciá sesión para continuar</div>
+
+        <label>Usuario</label>
+
+        <input
+            id="loginUsuario"
+            type="text"
+            autocomplete="username"
+            placeholder="usuario">
+
+        <label>Contraseña</label>
+
+        <input
+            id="loginPassword"
+            type="password"
+            autocomplete="current-password"
+            placeholder="contraseña">
+
+        <button type="submit">Ingresar</button>
+
+        <div id="loginError" class="loginError"></div>
+
+    </form>
+
+</div>
+
+<div id="appPrincipal" class="app oculto">
+
+    <!-- ===================================== -->
+    <!-- SIDEBAR -->
+    <!-- ===================================== -->
+
+    <aside class="sidebar">
+
+        <div class="logo">
+
+            FORRALITAS
+
+        </div>
+
+        <button id="Dashboard">
+
+            📊 Dashboard
+
+        </button>
+
+        <button id="Ventas">
+
+            💰 Ventas
+
+        </button>
+
+        <button id="Productos">
+
+            📦 Productos
+
+        </button>
+
+        <button id="Clientes">
+
+            👥 Clientes
+
+        </button>
+
+        <button id="Proveedores">
+
+            🚚 Proveedores
+
+        </button>
+
+        <button id="Gastos">
+
+            💸 Gastos
+
+        </button>
+
+        <button id="Historial">
+
+            📜 Historial
+
+        </button>
+
+        <button id="Reportes">
+
+            📈 Reportes
+
+        </button>
+
+        <button id="Configuracion">
+
+            ⚙ Configuración
+
+        </button>
+
+        <button id="Eliminaciones">
+
+            🗑️ Eliminaciones
+
+        </button>
+
+        <div id="usuarioActualUI"></div>
+
+    </aside>
+
+    <!-- ===================================== -->
+    <!-- CONTENIDO -->
+    <!-- ===================================== -->
+
+    <main class="principal">
+
+        <header class="cabecera">
+
+            <h1 id="tituloPagina">
+
+                Dashboard
+
+            </h1>
+
+        </header>
+
+        <section id="contenidoPrincipal">
+
+        </section>
+
+    </main>
+
+</div>
+
+<!-- ========================================== -->
+<!-- PANTALLA DETALLE DE CLIENTE -->
+<!-- ========================================== -->
+
+<div id="pantallaClienteDetalle" class="pantallaDetalle oculto">
+
+    <div class="detalleHeader">
+
+        <button id="btnVolverClientes" class="btnVolver">
+
+            ← Volver
+
+        </button>
+
+        <h1 id="tituloClienteDetalle"></h1>
+
+    </div>
+
+    <div id="contenidoClienteDetalle"></div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- PANTALLA PRECIOS DE CLIENTE -->
+<!-- ========================================== -->
+
+<div id="pantallaPreciosCliente" class="pantallaDetalle oculto">
+
+    <div class="detalleHeader">
+
+        <button id="btnVolverDetallePrecios" class="btnVolver">
+
+            ← Volver
+
+        </button>
+
+        <h1 id="tituloPreciosCliente"></h1>
+
+    </div>
+
+    <div id="contenidoPreciosCliente"></div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL PRODUCTO -->
+<!-- ========================================== -->
+
+<div
+    id="modalProducto"
+    class="modal oculto">
+
+    <div class="modalContenido">
+
+        <h2 id="tituloModalProducto">
+
+            Nuevo Producto
+
+        </h2>
+
+        <div class="grupoInput">
+            <label>Nombre</label>
+            <input id="nombreProducto" type="text">
+        </div>
+
+        <div class="grupoInput">
+            <label>Categoría</label>
+            <input id="categoriaProducto" type="text">
+        </div>
+
+        <div class="grupoInput">
+            <label>Peso por bolsa (Kg)</label>
+            <input id="pesoBolsa" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="grupoInput">
+            <label>Precio Bolsa</label>
+            <input id="precioBolsaProducto" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="grupoInput">
+            <label>Precio Kg</label>
+            <input id="precioKgProducto" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="grupoInput">
+            <label>Stock (Bolsas)</label>
+            <input id="stockProducto" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="grupoInput">
+            <label>Stock mínimo</label>
+            <input id="stockMinimoProducto" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="accionesModal">
+            <button id="guardarProducto" class="btnGuardar">Guardar</button>
+            <button onclick="cerrarModalProducto()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL CLIENTE -->
+<!-- ========================================== -->
+
+<div
+    id="modalCliente"
+    class="modal oculto">
+
+    <div class="modalContenido">
+
+        <h2 id="tituloModalCliente">
+
+            Nuevo Cliente
+
+        </h2>
+
+        <div class="grupoInput">
+            <label>Nombre</label>
+            <input id="nombreCliente" type="text">
+        </div>
+
+        <div class="grupoInput">
+            <label>Teléfono</label>
+            <input id="telefonoCliente" type="text">
+        </div>
+
+        <div class="grupoInput">
+            <label>Dirección</label>
+            <input id="direccionCliente" type="text">
+        </div>
+
+        <div class="grupoInput">
+            <label>Saldo</label>
+            <input id="saldoCliente" type="text" inputmode="decimal" autocomplete="off" value="0" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="grupoInput">
+            <label>Observaciones</label>
+            <textarea id="observacionesCliente"></textarea>
+        </div>
+
+        <div class="accionesModal">
+            <button id="guardarCliente" class="btnGuardar">Guardar</button>
+            <button onclick="cerrarModalCliente()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL CANTIDAD -->
+<!-- ========================================== -->
+
+<div
+    id="modalCantidad"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2 id="tituloModalCantidad">
+
+            Cantidad
+
+        </h2>
+
+        <input
+            id="inputCantidad"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            oninput="limpiarNumero(this); actualizarPreviewCantidad()">
+
+        <small
+            id="previewCantidad"
+            class="previewCantidad"></small>
+
+        <div class="accionesModal">
+            <button onclick="confirmarCantidad()" class="btnGuardar">Agregar</button>
+            <button onclick="cerrarModalCantidad()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL PRECIO PRODUCTO (CLIENTE) -->
+<!-- ========================================== -->
+
+<div
+    id="modalPrecioCliente"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2 id="tituloModalPrecioCliente">Precio personalizado</h2>
+
+        <div class="grupoInput">
+            <label>Producto</label>
+            <input id="nombrePrecioProducto" type="text" readonly>
+        </div>
+
+        <div class="grupoInput">
+            <label>Precio Bolsa</label>
+            <input id="precioBolsaCliente" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="grupoInput">
+            <label>Precio Kg</label>
+            <input id="precioKgCliente" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="accionesModal">
+            <button id="guardarPrecioCliente" class="btnGuardar">Guardar</button>
+            <button onclick="cerrarModalPrecioCliente()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL REGISTRAR PAGO (CLIENTE) -->
+<!-- ========================================== -->
+
+<div
+    id="modalPagoCliente"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2>Registrar pago</h2>
+
+        <div class="grupoInput">
+            <label>Saldo actual</label>
+            <input id="saldoActualPago" type="text" readonly>
+        </div>
+
+        <div class="grupoInput">
+            <label>Monto a pagar</label>
+            <input id="montoPagoCliente" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="grupoInput">
+            <label>Tipo de pago</label>
+            <select id="tipoPagoCliente">
+                <option value="efectivo">Efectivo</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="mixto">Mixto</option>
+            </select>
+        </div>
+
+        <div class="accionesModal">
+            <button id="guardarPagoCliente" class="btnGuardar">Registrar</button>
+            <button onclick="cerrarModalPagoCliente()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL GASTO -->
+<!-- ========================================== -->
+
+<div
+    id="modalGasto"
+    class="modal oculto">
+
+    <div class="modalContenido">
+
+        <h2 id="tituloModalGasto">Nuevo Gasto</h2>
+
+        <div class="grupoInput">
+            <label>Descripción</label>
+            <input id="descripcionGasto" type="text">
+        </div>
+
+        <div class="grupoInput">
+            <label>Monto</label>
+            <input id="montoGasto" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="grupoInput">
+            <label>Categoría</label>
+            <select id="categoriaGasto">
+                <option value="general">General</option>
+                <option value="compras">Compras</option>
+                <option value="servicios">Servicios</option>
+                <option value="sueldos">Sueldos</option>
+                <option value="otros">Otros</option>
+            </select>
+        </div>
+
+        <div class="grupoInput">
+            <label>Método de pago</label>
+            <div class="formasPago" id="formasPagoGasto">
+                <button type="button" id="btnEfectivoGasto" class="activo">Efectivo</button>
+                <button type="button" id="btnTransferenciaGasto">Transferencia</button>
+                <button type="button" id="btnMixtoGasto">Mixto</button>
+            </div>
+        </div>
+
+        <div class="pagoMixto" id="pagoMixtoGasto" style="margin-left:0">
+            <div>
+                <label>Efectivo</label>
+                <input id="montoEfectivoGasto" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+            </div>
+            <div>
+                <label>Transferencia</label>
+                <input id="montoTransferenciaGasto" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+            </div>
+        </div>
+
+        <div class="grupoInput">
+            <label>Fecha</label>
+            <input id="fechaGasto" type="date">
+        </div>
+
+        <div class="accionesModal">
+            <button id="guardarGasto" class="btnGuardar">Guardar</button>
+            <button onclick="cerrarModalGasto()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL PROVEEDOR -->
+<!-- ========================================== -->
+
+<div
+    id="modalProveedor"
+    class="modal oculto">
+
+    <div class="modalContenido">
+
+        <h2 id="tituloModalProveedor">Nuevo Proveedor</h2>
+
+        <div class="grupoInput">
+            <label>Nombre</label>
+            <input id="nombreProveedor" type="text">
+        </div>
+
+        <div class="grupoInput">
+            <label>Teléfono</label>
+            <input id="telefonoProveedor" type="text">
+        </div>
+
+        <div class="grupoInput">
+            <label>Dirección</label>
+            <input id="direccionProveedor" type="text">
+        </div>
+
+        <div class="grupoInput">
+            <label>Tipo de Pago</label>
+            <input id="tipoDePagoProveedor" type="text">
+        </div>
+
+        <div class="grupoInput">
+            <label>Observaciones</label>
+            <textarea id="observacionesProveedor"></textarea>
+        </div>
+
+        <div class="accionesModal">
+            <button id="guardarProveedor" class="btnGuardar">Guardar</button>
+            <button onclick="cerrarModalProveedor()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL CONFIRMACION -->
+<!-- ========================================== -->
+
+<div
+    id="modalConfirmacion"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2>Confirmación</h2>
+
+        <p id="textoConfirmacion"></p>
+
+        <div class="accionesModal">
+            <button id="btnAceptarConfirmacion" class="btnGuardar">Aceptar</button>
+            <button id="btnCancelarConfirmacion" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- CONTENEDOR DE NOTIFICACIONES -->
+<!-- ========================================== -->
+
+<div id="contenedorNotificaciones"></div>
+
+<!-- ========================================== -->
+<!-- JAVASCRIPT -->
+<!-- ========================================== -->
+
+<script type="module" src="./src/js/firebase/firebase-init.js"></script>
+<script src="./src/js/ui/ui.js"></script>
+<script src="./src/js/auth/auth.js"></script>
+<script src="./src/js/app.js"></script>
+<script src="./src/js/dashboard.js"></script>
+<script src="./src/js/productos.js"></script>
+<script src="./src/js/modules/ventas.js"></script>
+<script src="./src/js/clientes.js"></script>
+<script src="./src/js/clienteDetalle.js"></script>
+<script src="./src/js/preciosClientes.js"></script>
+<script src="./src/js/proveedores.js"></script>
+<script src="./src/js/gastos.js"></script>
+<script src="./src/js/historial.js"></script>
+<script src="./src/js/reportes.js"></script>
+<script src="./src/js/configuracion.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,841 @@
+/*=========================================
+    VENTAS
+=========================================*/
+
+.ventasSuperior{
+
+    display:grid;
+
+    grid-template-columns:1.2fr 1.2fr auto;
+
+    gap:18px;
+
+    align-items:end;
+
+    margin-bottom:18px;
+
+}
+
+.ventasSuperior label{
+
+    display:block;
+
+    font-size:14px;
+
+    font-weight:700;
+
+    color:#333;
+
+    margin-bottom:8px;
+
+}
+
+.clienteVenta,
+.busquedaVenta{
+
+    display:flex;
+
+    flex-direction:column;
+
+    position:relative;
+
+}
+
+#listaClientesVenta{
+
+    position:absolute;
+
+    top:78px;
+
+    left:0;
+
+    width:100%;
+
+    background:#fff;
+
+    border-radius:14px;
+
+    overflow:hidden;
+
+    box-shadow:0 12px 30px rgba(0,0,0,.15);
+
+    z-index:100;
+
+    max-height:320px;
+
+    overflow-y:auto;
+
+}
+
+.clienteSeleccionado{
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:space-between;
+
+    gap:10px;
+
+    margin-top:10px;
+
+    padding:10px 14px;
+
+    background:#e8f5e9;
+
+    border-radius:12px;
+
+    border:1px solid #c8e6c9;
+
+    font-weight:700;
+
+    color:#1b5e20;
+
+}
+
+.btnQuitarCliente{
+
+    border:none;
+
+    background:#fff;
+
+    color:#666;
+
+    width:28px;
+
+    height:28px;
+
+    border-radius:50%;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+}
+
+.btnQuitarCliente:hover{
+
+    background:#ffcdd2;
+
+    color:#c62828;
+
+}
+
+.itemBusquedaVacio{
+
+    padding:14px 16px;
+
+    color:#888;
+
+    font-size:14px;
+
+}
+
+.tablaVenta .tablaVacia{
+
+    padding:35px;
+
+    color:#888;
+
+    text-align:center;
+
+}
+
+.clienteVenta input,
+.busquedaVenta input{
+
+    height:46px;
+
+    margin:0;
+
+    padding:0 16px;
+
+    border:2px solid #e5e7eb;
+
+    border-radius:14px;
+
+    background:#fff;
+
+    transition:.25s;
+
+}
+
+.clienteVenta input:focus,
+.busquedaVenta input:focus{
+
+    border-color:var(--verde);
+
+    box-shadow:0 0 0 4px rgba(46,125,50,.12);
+
+}
+
+.busquedaVenta{
+
+    position:relative;
+
+}
+
+#listaProductosVenta{
+
+    position:absolute;
+
+    top:78px;
+
+    left:0;
+
+    width:100%;
+
+    background:#fff;
+
+    border-radius:14px;
+
+    overflow:hidden;
+
+    box-shadow:0 12px 30px rgba(0,0,0,.15);
+
+    z-index:100;
+
+    max-height:320px;
+
+    overflow-y:auto;
+
+}
+
+.itemBusquedaProducto{
+
+    padding:14px 16px;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+    border-bottom:1px solid #eee;
+
+}
+
+.itemBusquedaProducto:hover{
+
+    background:#f4fbf4;
+
+}
+
+.itemBusquedaProducto strong{
+
+    color:#222;
+
+}
+
+.itemBusquedaProducto small{
+
+    color:#666;
+
+}
+
+.modoVenta{
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    gap:8px;
+
+    background:#f5f7fb;
+
+    padding:8px;
+
+    border-radius:18px;
+
+    border:1px solid #ececec;
+
+    height:62px;
+
+}
+
+.modoVenta button{
+
+    width:95px;
+
+    height:44px;
+
+    border:none;
+
+    border-radius:12px;
+
+    background:#fff;
+
+    color:#222;
+
+    font-weight:700;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+}
+
+.modoVenta button:hover{
+
+    transform:translateY(-1px);
+
+}
+
+.modoActivo{
+
+    background:var(--verde)!important;
+
+    color:#fff!important;
+
+}
+
+/* Saldo y estado de venta */
+
+.saldoClienteVenta{
+
+    margin-top:10px;
+
+    font-size:14px;
+
+    color:#555;
+
+    display:none;
+
+}
+
+.saldoClienteVenta strong{
+
+    color:var(--verde);
+
+    font-weight:800;
+
+}
+
+.estadoVenta{
+
+    display:none;
+
+    align-items:center;
+
+    gap:10px;
+
+    margin-top:12px;
+
+}
+
+.estadoVenta span{
+
+    font-size:14px;
+
+    font-weight:700;
+
+    color:#555;
+
+}
+
+.estadoVenta button{
+
+    width:auto;
+
+    margin:0;
+
+    padding:10px 18px;
+
+    border:none;
+
+    border-radius:10px;
+
+    background:#e0e0e0;
+
+    color:#333;
+
+    font-weight:700;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+}
+
+.estadoVenta button.estadoActivo{
+
+    background:var(--verde);
+
+    color:#fff;
+
+}
+
+/*=========================================
+    TABLA
+=========================================*/
+
+.tablaVenta{
+
+    background:#fff;
+
+    border-radius:18px;
+
+    overflow:hidden;
+
+    box-shadow:0 8px 22px rgba(0,0,0,.08);
+
+    margin-bottom:18px;
+
+}
+
+.tablaVenta table{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+}
+
+.tablaVenta thead{
+
+    background:var(--verde);
+
+    color:#fff;
+
+}
+
+.tablaVenta th{
+
+    padding:18px 14px;
+
+    font-size:15px;
+
+    text-align:center;
+
+    font-weight:700;
+
+}
+
+.tablaVenta th:first-child{
+
+    width:30%;
+
+}
+
+.tablaVenta th:nth-child(2){
+
+    width:12%;
+
+}
+
+.tablaVenta th:nth-child(3){
+
+    width:14%;
+
+}
+
+.tablaVenta th:nth-child(4){
+
+    width:18%;
+
+}
+
+.tablaVenta th:nth-child(5){
+
+    width:18%;
+
+}
+
+.tablaVenta th:last-child{
+
+    width:8%;
+
+}
+
+.tablaVenta td{
+
+    padding:15px 12px;
+
+    border-bottom:1px solid #ededed;
+
+    text-align:center;
+
+    background:#fff;
+
+}
+
+.tablaVenta tbody tr{
+
+    transition:.18s;
+
+}
+
+.tablaVenta tbody tr:hover{
+
+    background:#f5fbf5;
+
+}
+
+.tablaVenta tbody tr:hover td{
+
+    background:#f5fbf5;
+
+}
+
+.tablaVenta td:first-child{
+
+    text-align:left;
+
+    font-weight:600;
+
+}
+
+.tablaVenta .btnEliminar{
+
+    width:38px;
+
+    height:38px;
+
+    padding:0;
+
+    border-radius:10px;
+
+}
+
+.tablaVenta .btnEliminar:hover{
+
+    transform:scale(1.08);
+
+}
+
+/*=========================================
+    PANEL INFERIOR
+=========================================*/
+
+.pieVenta{
+
+    background:#fff;
+
+    border-radius:18px;
+
+    box-shadow:0 8px 22px rgba(0,0,0,.08);
+
+    padding:22px;
+
+    display:grid;
+
+    grid-template-columns:minmax(150px, max-content) 1fr auto;
+
+    align-items:center;
+
+    gap:22px;
+
+}
+
+.totalVenta{
+
+    display:flex;
+
+    flex-direction:column;
+
+    justify-content:center;
+
+    min-width:0;
+
+}
+
+.totalVenta h3,
+.totalVenta small{
+
+    font-size:18px;
+
+    color:#111;
+
+    margin-bottom:4px;
+
+    font-weight:800;
+
+    display:block;
+
+}
+
+.totalVenta h2{
+
+    color:var(--verde);
+
+    font-size:clamp(26px, 3.2vw, 42px);
+
+    font-weight:800;
+
+    white-space:nowrap;
+
+    line-height:1.1;
+
+}
+
+#totalVenta{
+
+    color:var(--verde);
+
+}
+
+/*=========================================
+    FORMAS DE PAGO
+=========================================*/
+
+.formasPago{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:12px;
+
+    flex-wrap:wrap;
+
+}
+
+.formasPago button{
+
+    height:48px;
+
+    padding:0 24px;
+
+    border:none;
+
+    border-radius:12px;
+
+    background:#f3f4f6;
+
+    color:#222;
+
+    font-weight:700;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+    box-shadow:0 2px 8px rgba(0,0,0,.05);
+
+}
+
+.formasPago button:hover{
+
+    transform:translateY(-1px);
+
+    background:#eceff1;
+
+}
+
+.formasPago button.activo{
+
+    background:var(--verde);
+
+    color:#fff;
+
+}
+
+.pagoMixto{
+
+    display:none;
+
+    align-items:center;
+
+    gap:12px;
+
+    margin-left:10px;
+
+    animation:mostrarMixto .25s ease;
+
+}
+
+.pagoMixto.activo{
+
+    display:flex;
+
+}
+
+.pagoMixto label{
+
+    font-size:13px;
+
+    font-weight:700;
+
+    color:#555;
+
+}
+
+.pagoMixto input{
+
+    width:120px;
+
+    height:42px;
+
+    margin:0;
+
+    padding:0 12px;
+
+    border:2px solid #e5e7eb;
+
+    border-radius:10px;
+
+    text-align:right;
+
+    font-size:15px;
+
+    transition:.2s;
+
+}
+
+.pagoMixto input:focus{
+
+    border-color:var(--verde);
+
+    box-shadow:0 0 0 4px rgba(46,125,50,.12);
+
+}
+
+#btnRegistrarVenta{
+
+    height:48px;
+
+    padding:0 28px;
+
+    font-size:15px;
+
+    font-weight:700;
+
+    border-radius:12px;
+
+    margin-left:auto;
+
+}
+
+/*=========================================
+    ANIMACIONES
+=========================================*/
+
+@keyframes aparecer{
+
+    from{
+
+        opacity:0;
+
+        transform:translateY(10px);
+
+    }
+
+    to{
+
+        opacity:1;
+
+        transform:translateY(0);
+
+    }
+
+}
+
+@keyframes mostrarMixto{
+
+    from{
+
+        opacity:0;
+
+        transform:translateX(-12px);
+
+    }
+
+    to{
+
+        opacity:1;
+
+        transform:translateX(0);
+
+    }
+
+}
+
+.ventasSuperior,
+.tablaVenta,
+.pieVenta{
+
+    animation:aparecer .3s ease;
+
+}
+
+/*=========================================
+    RESPONSIVE
+=========================================*/
+
+@media(max-width:1200px){
+
+    .ventasSuperior{
+
+        grid-template-columns:1fr;
+
+    }
+
+    .modoVenta{
+
+        justify-content:flex-start;
+
+    }
+
+    .pieVenta{
+
+        grid-template-columns:1fr;
+
+        gap:18px;
+
+    }
+
+    .formasPago{
+
+        width:100%;
+
+    }
+
+    .pagoMixto{
+
+        width:100%;
+
+        flex-wrap:wrap;
+
+    }
+
+    #btnRegistrarVenta{
+
+        width:100%;
+
+        margin-left:0;
+
+    }
+
+}
+
+@media(max-width:700px){
+
+    .modoVenta{
+
+        flex-wrap:wrap;
+
+        height:auto;
+
+    }
+
+    .modoVenta button{
+
+        flex:1;
+
+        min-width:90px;
+
+    }
+
+    .tablaVenta{
+
+        overflow-x:auto;
+
+    }
+
+    .tablaVenta table{
+
+        min-width:850px;
+
+    }
+
+}
