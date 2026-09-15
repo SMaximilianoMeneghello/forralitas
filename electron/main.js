@@ -69,6 +69,24 @@ function iniciarActualizacionesAutomaticas() {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
 
+    autoUpdater.on("checking-for-update", () => {
+
+        console.log("[Actualizaciones] Buscando actualizaciones...");
+
+    });
+
+    autoUpdater.on("update-available", (info) => {
+
+        console.log("[Actualizaciones] Hay una nueva versión:", info.version);
+
+    });
+
+    autoUpdater.on("update-not-available", () => {
+
+        console.log("[Actualizaciones] Ya tenés la última versión instalada.");
+
+    });
+
     autoUpdater.on("update-downloaded", () => {
 
         dialog.showMessageBox(ventanaPrincipal, {
@@ -97,6 +115,14 @@ function iniciarActualizacionesAutomaticas() {
     autoUpdater.on("error", (error) => {
 
         console.error("[Actualizaciones] Error buscando actualización:", error);
+
+        dialog.showMessageBox(ventanaPrincipal, {
+
+            type: "error",
+            title: "Error buscando actualizaciones",
+            message: "No se pudo revisar si hay una actualización nueva.\n\n" + String(error)
+
+        });
 
     });
 

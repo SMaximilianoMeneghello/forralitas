@@ -542,3 +542,53 @@ table{
     }
 
 }
+
+/* ==========================================
+   TAMAÑO DE TARJETAS (ajustable por PC desde
+   Configuración > Apariencia). No se sincroniza
+   con Firebase a propósito: cada computadora
+   puede elegir el tamaño que le resulte más
+   cómodo, sin afectar a las demás.
+========================================== */
+
+body.tarjetasChicas{
+
+    --card-min-ancho: 170px;
+
+}
+
+body.tarjetasChicas .cardMetrica{
+
+    padding:14px;
+
+}
+
+body.tarjetasChicas .cardMetrica h2{
+
+    font-size:22px;
+
+}
+
+body.tarjetasChicas .cardMetrica small{
+
+    font-size:11px;
+
+}
+
+body.tarjetasGrandes{
+
+    --card-min-ancho: 300px;
+
+}
+
+body.tarjetasGrandes .cardMetrica{
+
+    padding:32px;
+
+}
+
+body.tarjetasGrandes .cardMetrica h2{
+
+    font-size:42px;
+
+}

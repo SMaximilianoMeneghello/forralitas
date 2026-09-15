@@ -101,9 +101,7 @@ function obtenerListaEmpleadosParaFiltro(){
 
     (typeof usuarios !== "undefined" ? usuarios : []).forEach(u =>{
 
-        // Los administradores no registran ventas, así que no tiene
-        // sentido que aparezcan como opción para filtrar por vendedor.
-        if(u.nombre && u.rol !== "admin") nombres.add(u.nombre);
+        if(u.nombre) nombres.add(u.nombre);
 
     });
 
@@ -118,6 +116,26 @@ function obtenerListaEmpleadosParaFiltro(){
 function textoMetodoPago(venta){
 
     if(!venta || !venta.metodoPago) return "—";
+
+    if(venta.metodoPago === "debe"){
+
+        // Compatibilidad con ventas viejas que no tenían saldoPendiente:
+        // si nunca se registró como pagada, se toma como que debe el total.
+        const pendiente = venta.saldoPendiente !== undefined
+            ? Number(venta.saldoPendiente)
+            : Number(venta.total || 0);
+
+        const pagada = venta.pagada === true || pendiente <= 0.01;
+
+        if(pagada){
+
+            return `<span style="color:var(--verde);font-weight:800">✔ PAGADO</span>`;
+
+        }
+
+        return `<span style="color:var(--rojo);font-weight:800">DEBE ${dinero(pendiente)}</span>`;
+
+    }
 
     if(venta.metodoPago === "efectivo") return "Efectivo";
 

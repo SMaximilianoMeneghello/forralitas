@@ -12,7 +12,11 @@ function renderDashboard(){
 
     const ventasHoy = historialVentas.filter(v=>fechaLocalISO(v.fecha)===hoy);
 
-    const totalVentasHoy = ventasHoy.reduce((acc,v)=>acc+Number(v.total||0),0);
+    // Las ventas "DEBE" (fiado) todavía no se cobraron, no se suman
+    // como plata del día.
+    const totalVentasHoy = ventasHoy
+        .filter(v => v.metodoPago !== "debe")
+        .reduce((acc,v)=>acc+Number(v.total||0),0);
 
     const totalGastos = gastos.reduce((acc,g)=>acc+Number(g.monto||0),0);
 
@@ -25,7 +29,53 @@ function renderDashboard(){
     .sort((a,b)=>a.stock-b.stock)
     .slice(0,8);
 
+    const hoyISO = fechaLocalISO(new Date());
+
+    const pagosProveedorPendientes = [];
+
+    proveedores.forEach(prov =>{
+
+        (prov.compras || []).forEach(c =>{
+
+            if(Number(c.saldoPendiente || 0) > 0.01 && c.fechaVencimiento && c.fechaVencimiento <= hoyISO){
+
+                pagosProveedorPendientes.push({
+
+                    proveedor: prov.nombre,
+                    proveedorId: prov.id,
+                    descripcion: c.descripcion,
+                    monto: c.saldoPendiente,
+                    vencido: c.fechaVencimiento < hoyISO,
+                    fechaVencimientoTexto: c.fechaVencimientoTexto
+
+                });
+
+            }
+
+        });
+
+    });
+
+    pagosProveedorPendientes.sort((a, b) => (b.vencido - a.vencido));
+
     contenido().innerHTML=`
+
+    ${
+        pagosProveedorPendientes.length ? `
+            <div class="card" style="border:2px solid var(--rojo);margin-bottom:20px">
+                <h2>🚨 Pagos a proveedores para hoy</h2>
+                ${pagosProveedorPendientes.map(p => `
+                    <div class="ventaDashboard">
+                        <div>
+                            <strong>${p.proveedor}</strong>
+                            <small>${p.descripcion} ${p.vencido ? "— vencido el " + p.fechaVencimientoTexto : "— vence hoy"}</small>
+                        </div>
+                        <span class="saldoDeuda">${dinero(p.monto)}</span>
+                    </div>
+                `).join("")}
+            </div>
+        ` : ""
+    }
 
     <div class="dashboardGrid">
 

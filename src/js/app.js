@@ -10,10 +10,8 @@ let proveedores = [];
 let gastos = [];
 let historialVentas = [];
 let eliminaciones = [];
-
-// Número correlativo de venta que se muestra en la pantalla del galpón
-// (1, 2, 3... nunca se repite, se guarda en Firebase para no perderse).
-let contadorVentaGalpon = Number(localStorage.getItem("contadorVentaGalpon")) || 0;
+let mezclas = [];
+let carpetasNotas = [];
 
 // Variables de trabajo
 
@@ -37,7 +35,9 @@ const ENTIDADES_SINCRONIZADAS = [
     { nombre: "proveedores", obtener: () => proveedores, asignar: v => proveedores = v },
     { nombre: "gastos", obtener: () => gastos, asignar: v => gastos = v },
     { nombre: "historialVentas", obtener: () => historialVentas, asignar: v => historialVentas = v },
-    { nombre: "eliminaciones", obtener: () => eliminaciones, asignar: v => eliminaciones = v }
+    { nombre: "eliminaciones", obtener: () => eliminaciones, asignar: v => eliminaciones = v },
+    { nombre: "mezclas", obtener: () => mezclas, asignar: v => mezclas = v },
+    { nombre: "carpetasNotas", obtener: () => carpetasNotas, asignar: v => carpetasNotas = v }
 ];
 
 /* ==========================================
@@ -55,8 +55,6 @@ async function iniciarApp(){
     await sincronizarConfiguracionFirebase();
 
     await inicializarPreciosClientesFirebase();
-
-    await sincronizarContadorGalpon();
 
     iniciarEventosLogin();
 
@@ -106,6 +104,14 @@ function iniciarModalesGlobales(){
 
     if(guardarPagoBtn) guardarPagoBtn.onclick = guardarPagoCliente;
 
+    const btnEfectivoPagoCliente = document.getElementById("btnEfectivoPagoCliente");
+    const btnTransferenciaPagoCliente = document.getElementById("btnTransferenciaPagoCliente");
+    const btnMixtoPagoCliente = document.getElementById("btnMixtoPagoCliente");
+
+    if(btnEfectivoPagoCliente) btnEfectivoPagoCliente.onclick = () => cambiarMetodoPagoCliente("efectivo");
+    if(btnTransferenciaPagoCliente) btnTransferenciaPagoCliente.onclick = () => cambiarMetodoPagoCliente("transferencia");
+    if(btnMixtoPagoCliente) btnMixtoPagoCliente.onclick = () => cambiarMetodoPagoCliente("mixto");
+
     const btnVolverClientes = document.getElementById("btnVolverClientes");
 
     if(btnVolverClientes) btnVolverClientes.onclick = cerrarPantallaClienteDetalle;
@@ -130,6 +136,38 @@ function iniciarModalesGlobales(){
 
     if(guardarProveedorBtn) guardarProveedorBtn.onclick = guardarProveedor;
 
+    const btnVolverProveedores = document.getElementById("btnVolverProveedores");
+
+    if(btnVolverProveedores) btnVolverProveedores.onclick = cerrarPantallaProveedorDetalle;
+
+    const guardarCompraProveedorBtn = document.getElementById("guardarCompraProveedor");
+
+    if(guardarCompraProveedorBtn) guardarCompraProveedorBtn.onclick = guardarCompraProveedor;
+
+    const guardarPagoProveedorBtn = document.getElementById("guardarPagoProveedor");
+
+    if(guardarPagoProveedorBtn) guardarPagoProveedorBtn.onclick = guardarPagoProveedor;
+
+    const btnVolverAnotaciones = document.getElementById("btnVolverAnotaciones");
+
+    if(btnVolverAnotaciones) btnVolverAnotaciones.onclick = cerrarPantallaAnotacionDetalle;
+
+    const guardarMezclaBtn = document.getElementById("guardarMezcla");
+
+    if(guardarMezclaBtn) guardarMezclaBtn.onclick = guardarMezcla;
+
+    const buscadorSalidaMezcla = document.getElementById("buscadorSalidaMezcla");
+
+    if(buscadorSalidaMezcla) activarBuscadorProductoMezcla(buscadorSalidaMezcla);
+
+    const btnVolverMezclas = document.getElementById("btnVolverMezclas");
+
+    if(btnVolverMezclas) btnVolverMezclas.onclick = cerrarPantallaMezclaDetalle;
+
+    const guardarProduccionMezclaBtn = document.getElementById("guardarProduccionMezcla");
+
+    if(guardarProduccionMezclaBtn) guardarProduccionMezclaBtn.onclick = guardarProduccionMezcla;
+
 }
 
 /* ==========================================
@@ -151,6 +189,10 @@ async function cargarDatos(){
     historialVentas = JSON.parse(localStorage.getItem("historialVentas")) || [];
 
     eliminaciones = JSON.parse(localStorage.getItem("eliminaciones")) || [];
+
+    mezclas = JSON.parse(localStorage.getItem("mezclas")) || [];
+
+    carpetasNotas = JSON.parse(localStorage.getItem("carpetasNotas")) || [];
 
     carrito = JSON.parse(localStorage.getItem("carrito")) || [];
 
@@ -232,6 +274,8 @@ function refrescarPantallaActual(){
         Proveedores: renderProveedores,
         Gastos: renderGastos,
         Historial: renderHistorial,
+        Mezclas: renderMezclas,
+        Anotaciones: renderAnotaciones,
         Reportes: renderReportes,
         Eliminaciones: renderEliminaciones
     };
@@ -261,6 +305,10 @@ function guardarDatos(){
 
     localStorage.setItem("eliminaciones", JSON.stringify(eliminaciones));
 
+    localStorage.setItem("mezclas", JSON.stringify(mezclas));
+
+    localStorage.setItem("carpetasNotas", JSON.stringify(carpetasNotas));
+
     localStorage.setItem("carrito", JSON.stringify(carrito));
 
     if(!window.FirebaseDB) return;
@@ -287,6 +335,8 @@ function iniciarEventos(){
         Proveedores: abrirProveedores,
         Gastos: abrirGastos,
         Historial: abrirHistorial,
+        Mezclas: abrirMezclas,
+        Anotaciones: abrirAnotaciones,
         Reportes: abrirReportes,
         Configuracion: abrirConfiguracion,
         Eliminaciones: abrirEliminaciones
@@ -322,6 +372,12 @@ function cambiarPagina(nombre){
     cerrarPantallaClienteDetalle();
 
     cerrarPantallaPreciosCliente();
+
+    cerrarPantallaAnotacionDetalle();
+
+    cerrarPantallaProveedorDetalle();
+
+    cerrarPantallaMezclaDetalle();
 
     const detalle=document.getElementById("pantallaClienteDetalle");
 
@@ -426,10 +482,26 @@ function abrirHistorial(){
 
 }
 
+function abrirMezclas(){
+
+    cambiarPagina("Mezclas");
+    titulo("Mezclas");
+    renderMezclas();
+
+}
+
+function abrirAnotaciones(){
+
+    cambiarPagina("Anotaciones");
+    titulo("Anotaciones");
+    renderAnotaciones();
+
+}
+
 function abrirReportes(){
 
     cambiarPagina("Reportes");
-    titulo("Reportes");
+    titulo("Caja");
     renderReportes();
 
 }
@@ -457,85 +529,6 @@ function abrirEliminaciones(){
     titulo("Historial de eliminaciones");
 
     renderEliminaciones();
-
-}
-
-/* ==========================================
-   PANTALLA DEL GALPÓN (AVISO DE VENTA)
-   Cada venta manda un aviso a Firebase con
-   número correlativo + productos, para que
-   la pantalla del galpón lo muestre en vivo.
-========================================== */
-
-async function sincronizarContadorGalpon(){
-
-    if(!window.FirebaseDB) return;
-
-    const remoto = await window.FirebaseDB.leerColeccion("contadorVentaGalpon");
-
-    if(remoto === undefined) return; // sin conexión: seguimos con el contador local
-
-    if(remoto === null){
-
-        window.FirebaseDB.guardarColeccion("contadorVentaGalpon", contadorVentaGalpon);
-
-    }else{
-
-        contadorVentaGalpon = Number(remoto) || 0;
-
-        localStorage.setItem("contadorVentaGalpon", contadorVentaGalpon);
-
-    }
-
-    window.FirebaseDB.escucharColeccion("contadorVentaGalpon", (remoto) =>{
-
-        contadorVentaGalpon = Number(remoto) || 0;
-
-        localStorage.setItem("contadorVentaGalpon", contadorVentaGalpon);
-
-    });
-
-}
-
-function obtenerSiguienteNumeroVentaGalpon(){
-
-    contadorVentaGalpon++;
-
-    localStorage.setItem("contadorVentaGalpon", contadorVentaGalpon);
-
-    if(window.FirebaseDB) window.FirebaseDB.guardarColeccion("contadorVentaGalpon", contadorVentaGalpon);
-
-    return contadorVentaGalpon;
-
-}
-
-function formatearItemGalpon(item){
-
-    const cantidad = formatearCantidadItem(item);
-
-    let unidad = unidadVenta(item.modo);
-
-    if(unidad === "Bolsa" && Number(cantidad) !== 1) unidad = "Bolsas";
-
-    return cantidad + " " + unidad + " de " + item.nombre;
-
-}
-
-function enviarAvisoGalpon(venta){
-
-    if(!window.FirebaseDB) return; // sin internet no se puede avisar a la pantalla
-
-    window.FirebaseDB.guardarColeccion("avisoGalpon", {
-
-        numero: venta.numeroGalpon,
-
-        items: (venta.productos || []).map(formatearItemGalpon),
-
-        hora: venta.fechaTexto,
-
-        enviado: Date.now()
-
-    });
 
 }
 
@@ -583,6 +576,34 @@ function abrirPantallaPreciosCliente(){
 
 }
 
+function abrirPantallaProveedorDetalle(){
+
+    const app = document.getElementById("appPrincipal");
+
+    const pantalla = document.getElementById("pantallaProveedorDetalle");
+
+    if(app) app.classList.add("oculto");
+
+    if(pantalla) pantalla.classList.remove("oculto");
+
+}
+
+function cerrarPantallaProveedorDetalle(){
+
+    const app = document.getElementById("appPrincipal");
+
+    const pantalla = document.getElementById("pantallaProveedorDetalle");
+
+    if(app && app.classList.contains("oculto")){
+
+        app.classList.remove("oculto");
+
+    }
+
+    if(pantalla) pantalla.classList.add("oculto");
+
+}
+
 function cerrarPantallaPreciosCliente(){
 
     const detalle = document.getElementById("pantallaClienteDetalle");
@@ -590,6 +611,34 @@ function cerrarPantallaPreciosCliente(){
     const pantalla = document.getElementById("pantallaPreciosCliente");
 
     if(detalle) detalle.classList.remove("oculto");
+
+    if(pantalla) pantalla.classList.add("oculto");
+
+}
+
+function abrirPantallaAnotacionDetalle(){
+
+    const app = document.getElementById("appPrincipal");
+
+    const pantalla = document.getElementById("pantallaAnotacionDetalle");
+
+    if(app) app.classList.add("oculto");
+
+    if(pantalla) pantalla.classList.remove("oculto");
+
+}
+
+function cerrarPantallaAnotacionDetalle(){
+
+    const app = document.getElementById("appPrincipal");
+
+    const pantalla = document.getElementById("pantallaAnotacionDetalle");
+
+    if(app && app.classList.contains("oculto")){
+
+        app.classList.remove("oculto");
+
+    }
 
     if(pantalla) pantalla.classList.add("oculto");
 

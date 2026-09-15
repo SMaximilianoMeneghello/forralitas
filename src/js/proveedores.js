@@ -48,6 +48,8 @@ function renderProveedores(){
                             <th>Teléfono</th>
                             <th>Dirección</th>
                             <th>Tipo de Pago</th>
+                            <th>Debe</th>
+                            <th>Vencimiento</th>
                             <th>Acciones</th>
                         </tr>
 
@@ -120,7 +122,7 @@ function actualizarTablaProveedores(){
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="tablaVacia">
+                <td colspan="7" class="tablaVacia">
                     Todavía no hay proveedores cargados.
                 </td>
             </tr>
@@ -134,7 +136,7 @@ function actualizarTablaProveedores(){
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="tablaVacia">
+                <td colspan="7" class="tablaVacia">
                     No se encontraron proveedores para "${filtroProveedores}".
                 </td>
             </tr>
@@ -146,13 +148,23 @@ function actualizarTablaProveedores(){
 
     listaFiltrada.forEach(proveedor =>{
 
+        const alerta = obtenerProximoVencimientoProveedor(proveedor);
+
         tbody.innerHTML += `
             <tr>
                 <td><strong>${proveedor.nombre}</strong></td>
                 <td>${proveedor.telefono || "—"}</td>
                 <td>${proveedor.direccion || "—"}</td>
-                <td>${proveedor.tipoDePago || "—"}</td>
+                <td>${proveedor.diasPago ? "Cada " + proveedor.diasPago + " días" : "—"}</td>
+                <td>${dinero(saldoPendienteProveedor(proveedor))}</td>
+                <td>${alerta}</td>
                 <td class="accionesTabla">
+                    <button
+                        class="btnAccion btnVer"
+                        title="Ver detalle"
+                        onclick="verDetalleProveedor('${proveedor.id}')">
+                        👁️
+                    </button>
                     <button
                         class="btnAccion btnEditar"
                         title="Editar"
@@ -174,6 +186,45 @@ function actualizarTablaProveedores(){
 }
 
 /* ==========================================
+   SALDO Y VENCIMIENTOS
+========================================== */
+
+function saldoPendienteProveedor(proveedor){
+
+    return (proveedor.compras || [])
+        .reduce((acc, c) => acc + Number(c.saldoPendiente || 0), 0);
+
+}
+
+function obtenerProximoVencimientoProveedor(proveedor){
+
+    const comprasDebiendo = (proveedor.compras || [])
+        .filter(c => Number(c.saldoPendiente || 0) > 0.01 && c.fechaVencimiento);
+
+    if(comprasDebiendo.length === 0) return `<span class="subMetrica">Al día</span>`;
+
+    const proxima = comprasDebiendo
+        .sort((a, b) => new Date(a.fechaVencimiento) - new Date(b.fechaVencimiento))[0];
+
+    const hoy = fechaLocalISO(new Date());
+
+    if(proxima.fechaVencimiento < hoy){
+
+        return `<span style="color:var(--rojo);font-weight:800">⚠ Vencido (${proxima.fechaVencimientoTexto})</span>`;
+
+    }
+
+    if(proxima.fechaVencimiento === hoy){
+
+        return `<span style="color:var(--rojo);font-weight:800">⚠ Vence hoy</span>`;
+
+    }
+
+    return `<span class="subMetrica">Vence ${proxima.fechaVencimientoTexto}</span>`;
+
+}
+
+/* ==========================================
    MODAL PROVEEDOR
 ========================================== */
 
@@ -187,9 +238,13 @@ function abrirModalNuevoProveedor(){
         "nombreProveedor",
         "telefonoProveedor",
         "direccionProveedor",
-        "tipoDePagoProveedor",
+        "diasPagoProveedorOtro",
         "observacionesProveedor"
     );
+
+    document.getElementById("diasPagoProveedor").value = "";
+
+    document.getElementById("grupoDiasPagoOtro").classList.add("oculto");
 
     abrir("modalProveedor");
 
@@ -210,8 +265,27 @@ function editarProveedor(id){
     document.getElementById("nombreProveedor").value = proveedor.nombre || "";
     document.getElementById("telefonoProveedor").value = proveedor.telefono || "";
     document.getElementById("direccionProveedor").value = proveedor.direccion || "";
-    document.getElementById("tipoDePagoProveedor").value = proveedor.tipoDePago || "";
     document.getElementById("observacionesProveedor").value = proveedor.observaciones || "";
+
+    const opcionesComunes = ["7", "15", "30", "45", "60"];
+
+    if(!proveedor.diasPago){
+
+        document.getElementById("diasPagoProveedor").value = "";
+        document.getElementById("grupoDiasPagoOtro").classList.add("oculto");
+
+    }else if(opcionesComunes.includes(String(proveedor.diasPago))){
+
+        document.getElementById("diasPagoProveedor").value = String(proveedor.diasPago);
+        document.getElementById("grupoDiasPagoOtro").classList.add("oculto");
+
+    }else{
+
+        document.getElementById("diasPagoProveedor").value = "otro";
+        document.getElementById("diasPagoProveedorOtro").value = proveedor.diasPago;
+        document.getElementById("grupoDiasPagoOtro").classList.remove("oculto");
+
+    }
 
     abrir("modalProveedor");
 
@@ -233,9 +307,13 @@ function guardarProveedor(){
 
     const direccion = document.getElementById("direccionProveedor").value.trim();
 
-    const tipoDePago = document.getElementById("tipoDePagoProveedor").value.trim();
-
     const observaciones = document.getElementById("observacionesProveedor").value.trim();
+
+    const seleccionDias = document.getElementById("diasPagoProveedor").value;
+
+    const diasPago = seleccionDias === "otro"
+        ? Number(document.getElementById("diasPagoProveedorOtro").value) || null
+        : (seleccionDias ? Number(seleccionDias) : null);
 
     if(proveedorEditandoId){
 
@@ -246,7 +324,7 @@ function guardarProveedor(){
             proveedor.nombre = nombre;
             proveedor.telefono = telefono;
             proveedor.direccion = direccion;
-            proveedor.tipoDePago = tipoDePago;
+            proveedor.diasPago = diasPago;
             proveedor.observaciones = observaciones;
 
             notificacion("Proveedor actualizado.");
@@ -262,8 +340,10 @@ function guardarProveedor(){
             nombre,
             telefono,
             direccion,
-            tipoDePago,
-            observaciones
+            diasPago,
+            observaciones,
+            compras: [],
+            pagos: []
 
         });
 
@@ -323,3 +403,30 @@ function cerrarModalProveedor(){
     cerrar("modalProveedor");
 
 }
+
+function verDetalleProveedor(id){
+
+    proveedorDetalleActualId = id;
+
+    abrirPantallaProveedorDetalle();
+
+    renderProveedorDetalle(id);
+
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+
+    const selectDias = document.getElementById("diasPagoProveedor");
+
+    if(selectDias){
+
+        selectDias.addEventListener("change", ()=>{
+
+            document.getElementById("grupoDiasPagoOtro")
+                .classList.toggle("oculto", selectDias.value !== "otro");
+
+        });
+
+    }
+
+});

@@ -24,6 +24,8 @@
     <link rel="stylesheet" href="./src/css/preciosClientes.css">
     <link rel="stylesheet" href="./src/css/proveedores.css">
     <link rel="stylesheet" href="./src/css/gastos.css">
+    <link rel="stylesheet" href="./src/css/mezclas.css">
+    <link rel="stylesheet" href="./src/css/anotaciones.css">
     <link rel="stylesheet" href="./src/css/historial.css">
     <link rel="stylesheet" href="./src/css/reportes.css">
     <link rel="stylesheet" href="./src/css/configuracion.css">
@@ -130,9 +132,21 @@
 
         </button>
 
+        <button id="Mezclas">
+
+            🧪 Mezclas
+
+        </button>
+
+        <button id="Anotaciones">
+
+            🗒️ Anotaciones
+
+        </button>
+
         <button id="Reportes">
 
-            📈 Reportes
+            🧮 Caja
 
         </button>
 
@@ -217,6 +231,28 @@
     </div>
 
     <div id="contenidoPreciosCliente"></div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- PANTALLA ANOTACIONES (BLOC DE NOTAS) -->
+<!-- ========================================== -->
+
+<div id="pantallaAnotacionDetalle" class="pantallaDetalle oculto">
+
+    <div class="detalleHeader">
+
+        <button id="btnVolverAnotaciones" class="btnVolver">
+
+            ← Volver
+
+        </button>
+
+        <h1 id="tituloAnotacionDetalle"></h1>
+
+    </div>
+
+    <div id="contenidoAnotacionDetalle"></div>
 
 </div>
 
@@ -420,17 +456,35 @@
         </div>
 
         <div class="grupoInput">
-            <label>Monto a pagar</label>
+            <label>Venta a la que se aplica el pago</label>
+            <div id="listaVentasPendientesPago" class="listaVentasPendientesPago">
+                <!-- se llena dinámicamente -->
+            </div>
+        </div>
+
+        <div class="grupoInput">
+            <label>Monto que pagó</label>
             <input id="montoPagoCliente" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
         </div>
 
         <div class="grupoInput">
-            <label>Tipo de pago</label>
-            <select id="tipoPagoCliente">
-                <option value="efectivo">Efectivo</option>
-                <option value="transferencia">Transferencia</option>
-                <option value="mixto">Mixto</option>
-            </select>
+            <label>Método de pago</label>
+            <div class="formasPago" id="formasPagoPagoCliente">
+                <button type="button" id="btnEfectivoPagoCliente" class="activo">Efectivo</button>
+                <button type="button" id="btnTransferenciaPagoCliente">Transferencia</button>
+                <button type="button" id="btnMixtoPagoCliente">Mixto</button>
+            </div>
+        </div>
+
+        <div class="pagoMixto" id="pagoMixtoPagoCliente" style="margin-left:0">
+            <div>
+                <label>Efectivo</label>
+                <input id="montoEfectivoPagoCliente" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+            </div>
+            <div>
+                <label>Transferencia</label>
+                <input id="montoTransferenciaPagoCliente" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+            </div>
         </div>
 
         <div class="accionesModal">
@@ -510,6 +564,195 @@
 </div>
 
 <!-- ========================================== -->
+<!-- MODAL MEZCLA -->
+<!-- ========================================== -->
+
+<div
+    id="modalMezcla"
+    class="modal oculto">
+
+    <div class="modalContenido">
+
+        <h2 id="tituloModalMezcla">Nueva Mezcla</h2>
+
+        <div class="grupoInput">
+            <label>Nombre de la mezcla</label>
+            <input id="nombreMezcla" type="text" placeholder="Ej: Mezcla de Caballo">
+        </div>
+
+        <div class="grupoInput">
+            <label>Producto de salida (la mezcla ya armada)</label>
+            <div class="buscadorProductoMezcla" id="buscadorSalidaMezcla">
+                <span class="buscadorProductoMezclaIcono">🔍</span>
+                <input type="text" class="inputBuscarProductoMezcla" placeholder="Buscar producto..." autocomplete="off">
+                <input type="hidden" class="idProductoMezclaSeleccionado">
+                <div class="listaSugerenciasProductoMezcla oculto"></div>
+            </div>
+        </div>
+
+        <div class="grupoInput">
+            <label>¿Cada lote de cuántas bolsas rinde la receta?</label>
+            <input
+                id="bolsasPorLoteMezcla"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="Ej: 10"
+                oninput="limpiarNumero(this)">
+        </div>
+
+        <hr style="margin:18px 0;border:none;border-top:1px solid #eee">
+
+        <label>Ingredientes que lleva UN lote</label>
+
+        <div id="listaIngredientesMezcla"></div>
+
+        <button
+            type="button"
+            class="btnAgregarFilaMezcla"
+            onclick="agregarFilaIngredienteMezcla()">
+            + Agregar ingrediente
+        </button>
+
+        <div class="grupoInput" style="margin-top:14px">
+            <label>Notas (opcional)</label>
+            <textarea id="notasMezcla" rows="2" placeholder="Alguna aclaración sobre esta receta..."></textarea>
+        </div>
+
+        <div class="accionesModal">
+            <button id="guardarMezcla" class="btnGuardar">Guardar receta</button>
+            <button onclick="cerrarModalMezcla()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- PANTALLA DETALLE / PRODUCCIÓN DE MEZCLA -->
+<!-- ========================================== -->
+
+<div id="pantallaMezclaDetalle" class="pantallaDetalle oculto">
+
+    <div class="detalleHeader">
+        <button id="btnVolverMezclas" class="btnVolver">← Volver</button>
+        <h1 id="tituloMezclaDetalle"></h1>
+    </div>
+
+    <div id="contenidoMezclaDetalle"></div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL REGISTRAR PRODUCCIÓN -->
+<!-- ========================================== -->
+
+<div
+    id="modalProduccionMezcla"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2>Registrar producción</h2>
+
+        <div class="grupoInput">
+            <label>¿Cuántas bolsas salieron esta vez?</label>
+            <input
+                id="cantidadProduccionMezcla"
+                type="text"
+                inputmode="numeric"
+                autocomplete="off"
+                oninput="limpiarNumero(this)">
+        </div>
+
+        <div id="previaIngredientesProduccion" class="previaIngredientesProduccion"></div>
+
+        <div class="accionesModal">
+            <button id="guardarProduccionMezcla" class="btnGuardar">Registrar y descontar stock</button>
+            <button onclick="cerrar('modalProduccionMezcla')" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL CARPETA DE ANOTACIONES -->
+<!-- ========================================== -->
+
+<div
+    id="modalCarpetaNota"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2 id="tituloModalCarpetaNota">Nueva carpeta</h2>
+
+        <div class="grupoInput">
+            <label>Título</label>
+            <input
+                id="tituloCarpetaNota"
+                type="text"
+                placeholder="Ej: Deudas de Gerardo"
+                autocomplete="off">
+        </div>
+
+        <div class="accionesModal">
+            <button onclick="guardarCarpetaNota()" class="btnGuardar">Guardar</button>
+            <button onclick="cerrarModalCarpetaNota()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL USUARIO (ADMIN) -->
+<!-- ========================================== -->
+
+<div
+    id="modalUsuario"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2 id="tituloModalUsuario">Nuevo Usuario</h2>
+
+        <div class="grupoInput">
+            <label>Nombre para mostrar</label>
+            <input id="nombreUsuarioNuevo" type="text" placeholder="Ej: Pedro">
+        </div>
+
+        <div class="grupoInput">
+            <label>Usuario (para iniciar sesión)</label>
+            <input id="loginUsuarioNuevo" type="text" placeholder="Ej: pedroforralitas" autocomplete="off">
+        </div>
+
+        <div class="grupoInput" id="grupoPasswordUsuarioNuevo">
+            <label>Contraseña</label>
+            <input id="passwordUsuarioNuevo" type="text" autocomplete="off">
+        </div>
+
+        <div class="grupoInput">
+            <label>Rol</label>
+            <select id="rolUsuarioNuevo">
+                <option value="empleado">Empleado</option>
+                <option value="admin">Administrador</option>
+            </select>
+        </div>
+
+        <div class="accionesModal">
+            <button id="guardarUsuarioAdmin" class="btnGuardar">Guardar</button>
+            <button onclick="cerrar('modalUsuario')" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
 <!-- MODAL PROVEEDOR -->
 <!-- ========================================== -->
 
@@ -537,8 +780,21 @@
         </div>
 
         <div class="grupoInput">
-            <label>Tipo de Pago</label>
-            <input id="tipoDePagoProveedor" type="text">
+            <label>Cada cuánto le pagamos</label>
+            <select id="diasPagoProveedor">
+                <option value="">Sin frecuencia fija</option>
+                <option value="7">Cada 7 días</option>
+                <option value="15">Cada 15 días</option>
+                <option value="30">Cada 30 días</option>
+                <option value="45">Cada 45 días</option>
+                <option value="60">Cada 60 días</option>
+                <option value="otro">Otra cantidad de días...</option>
+            </select>
+        </div>
+
+        <div class="grupoInput oculto" id="grupoDiasPagoOtro">
+            <label>¿Cada cuántos días?</label>
+            <input id="diasPagoProveedorOtro" type="text" inputmode="numeric" autocomplete="off" oninput="limpiarNumero(this)">
         </div>
 
         <div class="grupoInput">
@@ -549,6 +805,100 @@
         <div class="accionesModal">
             <button id="guardarProveedor" class="btnGuardar">Guardar</button>
             <button onclick="cerrarModalProveedor()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- PANTALLA DETALLE DE PROVEEDOR -->
+<!-- ========================================== -->
+
+<div id="pantallaProveedorDetalle" class="pantallaDetalle oculto">
+
+    <div class="detalleHeader">
+
+        <button id="btnVolverProveedores" class="btnVolver">
+            ← Volver
+        </button>
+
+        <h1 id="tituloProveedorDetalle"></h1>
+
+    </div>
+
+    <div id="contenidoProveedorDetalle"></div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL COMPRA A PROVEEDOR -->
+<!-- ========================================== -->
+
+<div
+    id="modalCompraProveedor"
+    class="modal oculto">
+
+    <div class="modalContenido">
+
+        <h2>Registrar compra</h2>
+
+        <div class="grupoInput">
+            <label>Qué le compramos</label>
+            <input id="descripcionCompraProveedor" type="text" placeholder="Ej: Maíz x 40kg (20 bolsas)">
+        </div>
+
+        <div class="grupoInput">
+            <label>Monto</label>
+            <input id="montoCompraProveedor" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="grupoInput">
+            <label>Fecha de la compra</label>
+            <input id="fechaCompraProveedor" type="date">
+        </div>
+
+        <div class="accionesModal">
+            <button id="guardarCompraProveedor" class="btnGuardar">Guardar</button>
+            <button onclick="cerrar('modalCompraProveedor')" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL PAGO A PROVEEDOR -->
+<!-- ========================================== -->
+
+<div
+    id="modalPagoProveedor"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2>Registrar pago</h2>
+
+        <div class="grupoInput">
+            <label>Le debemos en total</label>
+            <input id="saldoActualPagoProveedor" type="text" readonly>
+        </div>
+
+        <div class="grupoInput">
+            <label>Compra a la que se aplica el pago</label>
+            <div id="listaComprasPendientesPago" class="listaVentasPendientesPago">
+                <!-- se llena dinámicamente -->
+            </div>
+        </div>
+
+        <div class="grupoInput">
+            <label>Monto que pagamos</label>
+            <input id="montoPagoProveedor" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
+        </div>
+
+        <div class="accionesModal">
+            <button id="guardarPagoProveedor" class="btnGuardar">Registrar</button>
+            <button onclick="cerrar('modalPagoProveedor')" class="btnCancelar">Cancelar</button>
         </div>
 
     </div>
@@ -599,7 +949,11 @@
 <script src="./src/js/clienteDetalle.js"></script>
 <script src="./src/js/preciosClientes.js"></script>
 <script src="./src/js/proveedores.js"></script>
+<script src="./src/js/proveedorDetalle.js"></script>
 <script src="./src/js/gastos.js"></script>
+<script src="./src/js/mezclas.js"></script>
+<script src="./src/js/mezclaDetalle.js"></script>
+<script src="./src/js/anotaciones.js"></script>
 <script src="./src/js/historial.js"></script>
 <script src="./src/js/reportes.js"></script>
 <script src="./src/js/configuracion.js"></script>

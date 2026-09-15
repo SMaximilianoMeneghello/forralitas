@@ -147,6 +147,44 @@ function aplicarTema(){
 aplicarTema();
 
 /* ==========================================
+   TAMAÑO DE TARJETAS
+   (preferencia local de esta computadora,
+   no se sincroniza con Firebase a propósito)
+========================================== */
+
+function escalaTarjetasActual(){
+
+    return localStorage.getItem("escalaTarjetas") || "normal";
+
+}
+
+function aplicarEscalaTarjetas(){
+
+    const escala = escalaTarjetasActual();
+
+    document.body.classList.remove("tarjetasChicas", "tarjetasGrandes");
+
+    if(escala === "chicas") document.body.classList.add("tarjetasChicas");
+
+    if(escala === "grandes") document.body.classList.add("tarjetasGrandes");
+
+}
+
+function guardarEscalaTarjetas(){
+
+    const valor = document.getElementById("escalaTarjetas").value;
+
+    localStorage.setItem("escalaTarjetas", valor);
+
+    aplicarEscalaTarjetas();
+
+    notificacion("Tamaño de tarjetas actualizado (solo en esta computadora).", "success");
+
+}
+
+aplicarEscalaTarjetas();
+
+/* ==========================================
    RENDER CONFIGURACIÓN
 ========================================== */
 
@@ -167,6 +205,37 @@ function renderConfiguracion(){
     <p><b>Rol:</b> ${usuarioActual.rol}</p>
 
     </div>
+
+    ${esAdmin() ? `
+    <div class="cardConfig" style="grid-column:1/-1">
+
+    <h2>👥 Gestión de usuarios (Administrador)</h2>
+
+    <p style="margin-bottom:14px;color:#777">
+        Creá cuentas para cada empleado, cambiales el nombre, el rol o la
+        contraseña. Cada uno solo ve sus propias ventas y gastos en Caja.
+    </p>
+
+    <button class="btnAgregar" id="btnNuevoUsuarioAdmin" style="margin-bottom:14px">
+        + Nuevo usuario
+    </button>
+
+    <div class="tablaClientes">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tablaUsuariosAdmin"></tbody>
+        </table>
+    </div>
+
+    </div>
+    ` : ""}
 
     <div class="cardConfig">
 
@@ -243,6 +312,31 @@ function renderConfiguracion(){
     <button class="btnGuardar" id="guardarTema">
 
     Guardar Apariencia
+
+    </button>
+
+    </div>
+
+    <div class="cardConfig">
+
+    <h2>🗂️ Tamaño de tarjetas</h2>
+
+    <p style="font-size:13px;color:#888;margin-top:-6px;margin-bottom:10px">
+        Es una preferencia de esta computadora: cada PC puede elegir
+        la suya sin afectar a las demás.
+    </p>
+
+    <label>Tamaño</label>
+
+    <select id="escalaTarjetas">
+        <option value="normal" ${escalaTarjetasActual() === "normal" ? "selected" : ""}>Normal</option>
+        <option value="chicas" ${escalaTarjetasActual() === "chicas" ? "selected" : ""}>Compactas (entran más por fila)</option>
+        <option value="grandes" ${escalaTarjetasActual() === "grandes" ? "selected" : ""}>Grandes (más fáciles de leer)</option>
+    </select>
+
+    <button class="btnGuardar" id="guardarEscalaTarjetas">
+
+    Guardar Tamaño
 
     </button>
 
@@ -382,6 +476,8 @@ function renderConfiguracion(){
 
     document.getElementById("guardarTema").onclick = guardarTema;
 
+    document.getElementById("guardarEscalaTarjetas").onclick = guardarEscalaTarjetas;
+
     document.getElementById("guardarDashboard").onclick = guardarDashboardConfig;
 
     document.getElementById("guardarInventario").onclick = guardarInventario;
@@ -395,6 +491,209 @@ function renderConfiguracion(){
     document.getElementById("btnOptimizarSistema").onclick = optimizarSistema;
 
     document.getElementById("btnRestablecerConfiguracion").onclick = restablecerConfiguracion;
+
+    if(esAdmin()){
+
+        actualizarTablaUsuariosAdmin();
+
+        document.getElementById("btnNuevoUsuarioAdmin").onclick = abrirModalNuevoUsuarioAdmin;
+
+        document.getElementById("guardarUsuarioAdmin").onclick = guardarUsuarioAdmin;
+
+    }
+
+}
+
+/* ==========================================
+   GESTIÓN DE USUARIOS (SOLO ADMIN)
+========================================== */
+
+let usuarioAdminEditandoUsuario = null;
+
+function actualizarTablaUsuariosAdmin(){
+
+    const tbody = document.getElementById("tablaUsuariosAdmin");
+
+    if(!tbody) return;
+
+    tbody.innerHTML = [...usuarios]
+        .sort((a,b) => (a.nombre || "").localeCompare(b.nombre || ""))
+        .map(u => `
+            <tr>
+                <td>${u.nombre}</td>
+                <td>${u.usuario}</td>
+                <td>${u.rol === "admin" ? "Administrador" : "Empleado"}</td>
+                <td class="accionesTabla">
+                    <button
+                        class="btnAccion btnEditar"
+                        title="Editar"
+                        onclick="editarUsuarioAdmin('${u.usuario}')">
+                        ✏️
+                    </button>
+                    <button
+                        class="btnAccion btnBorrar"
+                        title="Eliminar"
+                        onclick="eliminarUsuarioAdmin('${u.usuario}')">
+                        🗑️
+                    </button>
+                </td>
+            </tr>
+        `).join("");
+
+}
+
+function abrirModalNuevoUsuarioAdmin(){
+
+    usuarioAdminEditandoUsuario = null;
+
+    document.getElementById("tituloModalUsuario").textContent = "Nuevo Usuario";
+
+    limpiar("nombreUsuarioNuevo", "loginUsuarioNuevo", "passwordUsuarioNuevo");
+
+    document.getElementById("loginUsuarioNuevo").disabled = false;
+
+    document.getElementById("rolUsuarioNuevo").value = "empleado";
+
+    document.getElementById("grupoPasswordUsuarioNuevo").querySelector("label").textContent = "Contraseña";
+
+    abrir("modalUsuario");
+
+}
+
+function editarUsuarioAdmin(loginUsuario){
+
+    const u = usuarios.find(x => x.usuario === loginUsuario);
+
+    if(!u) return;
+
+    usuarioAdminEditandoUsuario = loginUsuario;
+
+    document.getElementById("tituloModalUsuario").textContent = "Editar Usuario";
+
+    document.getElementById("nombreUsuarioNuevo").value = u.nombre || "";
+
+    document.getElementById("loginUsuarioNuevo").value = u.usuario || "";
+
+    // El usuario (login) no se puede cambiar una vez creado: queda
+    // referenciado en ventas y gastos viejos para saber quién los cargó.
+    document.getElementById("loginUsuarioNuevo").disabled = true;
+
+    document.getElementById("passwordUsuarioNuevo").value = "";
+
+    document.getElementById("grupoPasswordUsuarioNuevo").querySelector("label").textContent =
+        "Nueva contraseña (dejar vacío para no cambiarla)";
+
+    document.getElementById("rolUsuarioNuevo").value = u.rol || "empleado";
+
+    abrir("modalUsuario");
+
+}
+
+function guardarUsuarioAdmin(){
+
+    const nombre = document.getElementById("nombreUsuarioNuevo").value.trim();
+
+    const loginUsuario = document.getElementById("loginUsuarioNuevo").value.trim();
+
+    const password = document.getElementById("passwordUsuarioNuevo").value;
+
+    const rol = document.getElementById("rolUsuarioNuevo").value;
+
+    if(!nombre || !loginUsuario){
+
+        notificacion("Completá el nombre y el usuario.", "warning");
+
+        return;
+
+    }
+
+    if(usuarioAdminEditandoUsuario){
+
+        const u = usuarios.find(x => x.usuario === usuarioAdminEditandoUsuario);
+
+        if(!u) return;
+
+        u.nombre = nombre;
+
+        u.rol = rol;
+
+        if(password) u.password = password;
+
+        notificacion("Usuario actualizado.");
+
+    }else{
+
+        if(usuarios.some(x => x.usuario === loginUsuario)){
+
+            notificacion("Ya existe un usuario con ese nombre de acceso.", "warning");
+
+            return;
+
+        }
+
+        if(!password){
+
+            notificacion("Ingresá una contraseña para el usuario nuevo.", "warning");
+
+            return;
+
+        }
+
+        usuarios.push({ usuario: loginUsuario, password, nombre, rol });
+
+        notificacion("Usuario creado.");
+
+    }
+
+    guardarUsuarios();
+
+    cerrar("modalUsuario");
+
+    actualizarTablaUsuariosAdmin();
+
+    usuarioAdminEditandoUsuario = null;
+
+}
+
+function eliminarUsuarioAdmin(loginUsuario){
+
+    if(loginUsuario === usuarioActual.usuario){
+
+        notificacion("No podés eliminar tu propia cuenta mientras estás logueado con ella.", "warning");
+
+        return;
+
+    }
+
+    const u = usuarios.find(x => x.usuario === loginUsuario);
+
+    if(!u) return;
+
+    if(u.rol === "admin" && usuarios.filter(x => x.rol === "admin").length <= 1){
+
+        notificacion("Tiene que quedar al menos un administrador.", "warning");
+
+        return;
+
+    }
+
+    confirmar(
+
+        "¿Eliminar el usuario \"" + u.nombre + "\"? Sus ventas y gastos ya cargados quedan igual, solo se elimina el acceso.",
+
+        ()=>{
+
+            usuarios = usuarios.filter(x => x.usuario !== loginUsuario);
+
+            guardarUsuarios();
+
+            actualizarTablaUsuariosAdmin();
+
+            notificacion("Usuario eliminado.", "error");
+
+        }
+
+    );
 
 }
 

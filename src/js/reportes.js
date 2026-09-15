@@ -42,6 +42,16 @@ function renderReportes(){
 
             </div>
 
+            ${
+                !esAdmin()
+                ? `<p class="notaEliminaciones" style="margin-bottom:16px">
+                        Este reporte muestra únicamente tus propias ventas
+                        (${usuarioActual ? usuarioActual.nombre : ""}), para que
+                        no se mezcle con lo registrado por otras personas.
+                   </p>`
+                : ""
+            }
+
             <div id="contenidoReporte"></div>
 
         </div>
@@ -71,57 +81,6 @@ function filtrarHoyReporte(){
     document.getElementById("fechaHastaReporte").value = hoy;
 
     generarReporte();
-
-}
-
-/* ==========================================
-   RESERVA DE MAÍZ
-   Por cada bolsa de maíz vendida se aparta un
-   monto fijo (según el peso de la bolsa) para
-   reponer mercadería. El resto de esa venta
-   es ganancia.
-========================================== */
-
-const RESERVA_MAIZ_40KG = 11000;
-const RESERVA_MAIZ_OTRO_PESO = 12000; // bolsas de 45kg, 50kg, etc.
-
-function quitarAcentos(texto){
-
-    return (texto || "")
-        .toString()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase();
-
-}
-
-function calcularReservaMaiz(ventasFiltradas){
-
-    let total = 0;
-
-    ventasFiltradas.forEach(v =>{
-
-        (v.productos || []).forEach(item =>{
-
-            if(!quitarAcentos(item.nombre).includes("maiz")) return;
-
-            const bolsas = Number(item.bolsas || 0);
-
-            if(bolsas <= 0) return;
-
-            const producto = productos.find(p => p.id === item.id);
-
-            const peso = producto ? Number(producto.pesoBolsa || 0) : 0;
-
-            const reservaPorBolsa = peso === 40 ? RESERVA_MAIZ_40KG : RESERVA_MAIZ_OTRO_PESO;
-
-            total += bolsas * reservaPorBolsa;
-
-        });
-
-    });
-
-    return total;
 
 }
 
@@ -160,41 +119,71 @@ function generarReporte(){
 
         if(hasta && f > hasta) return false;
 
+        // Mismo criterio que las ventas: si hay un empleado puntual
+        // seleccionado (o el que inició sesión no es admin), la caja
+        // de gastos también queda separada por empleado. Los gastos
+        // viejos sin usuario asignado solo se ven en la vista "Todos".
+        if(empleadoSeleccionado && (g.vendedor && g.vendedor.nombre) !== empleadoSeleccionado) return false;
+
         return true;
 
     });
 
-    const totalVentas = ventas.reduce((acc, v) => acc + Number(v.total || 0), 0);
+    // Cobros de deudas de clientes (pagos de ventas "fiado"): esta plata
+    // entra a la caja el día que se COBRA, no el día de la venta original.
+    const cobrosPeriodo = clientes.flatMap(c => (c.pagos || []).map(p => ({ ...p, cliente: c.nombre })))
+        .filter(p =>{
+
+            const f = fechaLocalISO(p.fecha);
+
+            if(desde && f < desde) return false;
+
+            if(hasta && f > hasta) return false;
+
+            if(empleadoSeleccionado && (p.vendedor && p.vendedor.nombre) !== empleadoSeleccionado) return false;
+
+            return true;
+
+        });
+
+    const totalCobrado = cobrosPeriodo.reduce((acc, p) => acc + Number(p.monto || 0), 0);
+
+    const cobrosEfectivo = cobrosPeriodo
+        .reduce((acc, p) => acc + (p.pago ? Number(p.pago.efectivo || 0) : Number(p.monto || 0)), 0);
+
+    const cobrosTransferencia = cobrosPeriodo
+        .reduce((acc, p) => acc + (p.pago ? Number(p.pago.transferencia || 0) : 0), 0);
+
+    // Las ventas marcadas "DEBE" todavía no se cobraron: no cuentan
+    // como plata real en Total Ventas / métodos de pago. (Los pagos que
+    // se van cobrando después de una venta fiada se ven en el historial
+    // de pagos de cada cliente, todavía no se suman acá al período).
+    const ventasCobradas = ventas.filter(v => v.metodoPago !== "debe");
+
+    const totalVentas = ventasCobradas.reduce((acc, v) => acc + Number(v.total || 0), 0);
 
     const totalGastos = gastosPeriodo.reduce((acc, g) => acc + Number(g.monto || 0), 0);
 
-    // Se suma lo que realmente entró en efectivo/transferencia de CADA venta
-    // (incluyendo la parte que corresponde de las ventas con pago mixto,
-    // en vez de solo las ventas 100% efectivo o 100% transferencia).
-    const ventasEfectivo = ventas
+    // Se suma lo que realmente entró en efectivo/transferencia de CADA
+    // venta (incluida la parte que corresponde de las ventas con pago
+    // mixto), y se le resta lo que salió en gastos con ese mismo método.
+    const ventasEfectivo = ventasCobradas
         .reduce((acc, v) => acc + Number((v.pago && v.pago.efectivo) || 0), 0);
 
-    const ventasTransferencia = ventas
+    const ventasTransferencia = ventasCobradas
         .reduce((acc, v) => acc + Number((v.pago && v.pago.transferencia) || 0), 0);
 
-    const ventasMixtasLista = ventas.filter(v => v.metodoPago === "mixto");
+    const gastosEfectivo = gastosPeriodo
+        .reduce((acc, g) => acc + (g.pago ? Number(g.pago.efectivo || 0) : Number(g.monto || 0)), 0);
 
-    const ventasMixtas = ventasMixtasLista.length;
+    const gastosTransferencia = gastosPeriodo
+        .reduce((acc, g) => acc + (g.pago ? Number(g.pago.transferencia || 0) : 0), 0);
 
-    const totalVentasMixtas = ventasMixtasLista.reduce((acc, v) => acc + Number(v.total || 0), 0);
+    const dineroEfectivo = ventasEfectivo + cobrosEfectivo - gastosEfectivo;
 
-    // "Maíz": no es lo que se vendió de maíz, sino lo que hay que apartar
-    // por cada bolsa vendida para reponer mercadería (11.000 por bolsa de
-    // 40kg, 12.000 por bolsa de 45kg/50kg). El resto de la venta es ganancia.
-    const totalReservaMaiz = calcularReservaMaiz(ventas);
+    const dineroTransferencia = ventasTransferencia + cobrosTransferencia - gastosTransferencia;
 
-    const ventasDebe = ventas.filter(v =>{
-
-        const c = clientes.find(cl => cl.id === (v.cliente && v.cliente.id));
-
-        return c && Number(c.saldo || 0) > 0;
-
-    }).length;
+    const ventasMixtas = ventasCobradas.filter(v => v.metodoPago === "mixto").length;
 
     const ventasPorCliente = {};
 
@@ -229,6 +218,92 @@ function generarReporte(){
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8);
 
+    /* ==========================================
+       GANANCIA POR MAÍZ (solo bolsas, no suelto)
+       ------------------------------------------
+       Solo estos 3 productos exactos cuentan
+       (cualquier otro maíz —pisingallo, amarillo,
+       blanco, etc.— queda afuera), y solo cuando
+       se vendieron por bolsa entera, no sueltos
+       por kilo ni por monto en dinero.
+    ========================================== */
+
+    const GANANCIA_MAIZ_POR_BOLSA = {
+
+        "MAIZX40KG": 11000,
+        "MAIZX45KG": 12000,
+        "MAIZX50KG": 12000
+
+    };
+
+    function normalizarNombreProducto(nombre){
+
+        return (nombre || "").toUpperCase().replace(/\s+/g, "");
+
+    }
+
+    let gananciaMaiz = 0;
+    let bolsasMaizVendidas = 0;
+
+    ventas.forEach(v =>{
+
+        (v.productos || []).forEach(item =>{
+
+            if(item.modo !== "bolsa") return;
+
+            const clave = normalizarNombreProducto(item.nombre);
+
+            const gananciaPorBolsa = GANANCIA_MAIZ_POR_BOLSA[clave];
+
+            if(gananciaPorBolsa === undefined) return;
+
+            const cantidadBolsas = Number(item.cantidad || item.bolsas || 0);
+
+            gananciaMaiz += cantidadBolsas * gananciaPorBolsa;
+
+            bolsasMaizVendidas += cantidadBolsas;
+
+        });
+
+    });
+
+    /* ==========================================
+       SEPARAR ALFA
+       Se aparta $5.000 por cada bolsa de Alfa
+       Verde vendida, para reponer mercadería.
+    ========================================== */
+
+    const RESERVA_ALFA_POR_BOLSA = {
+
+        "ALFAVERDE": 5000
+
+    };
+
+    let reservaAlfa = 0;
+    let bolsasAlfaVendidas = 0;
+
+    ventas.forEach(v =>{
+
+        (v.productos || []).forEach(item =>{
+
+            if(item.modo !== "bolsa") return;
+
+            const clave = normalizarNombreProducto(item.nombre);
+
+            const reservaPorBolsa = RESERVA_ALFA_POR_BOLSA[clave];
+
+            if(reservaPorBolsa === undefined) return;
+
+            const cantidadBolsas = Number(item.cantidad || item.bolsas || 0);
+
+            reservaAlfa += cantidadBolsas * reservaPorBolsa;
+
+            bolsasAlfaVendidas += cantidadBolsas;
+
+        });
+
+    });
+
     const cont = document.getElementById("contenidoReporte");
 
     if(!cont) return;
@@ -240,31 +315,37 @@ function generarReporte(){
             <div class="cardMetrica">
                 <small>💰 Venta Total</small>
                 <h2>${dinero(totalVentas)}</h2>
-                <span class="subMetrica">${ventas.length} ventas</span>
+                <span class="subMetrica">${ventasCobradas.length} ventas</span>
             </div>
 
             <div class="cardMetrica">
-                <small>💸 Gastos</small>
+                <small>💸 Total de gastos</small>
                 <h2>${dinero(totalGastos)}</h2>
                 <span class="subMetrica">${gastosPeriodo.length} gastos</span>
             </div>
 
             <div class="cardMetrica">
-                <small>💵 Efectivo</small>
-                <h2>${dinero(ventasEfectivo)}</h2>
-                
+                <small>💵 Dinero en efectivo</small>
+                <h2>${dinero(dineroEfectivo)}</h2>
+                <span class="subMetrica">ventas + cobros de deuda, menos gastos (todo en efectivo)</span>
             </div>
 
             <div class="cardMetrica">
-                <small>🏦 Transferencia</small>
-                <h2>${dinero(ventasTransferencia)}</h2>
-                
+                <small>🏦 Dinero en transferencia</small>
+                <h2>${dinero(dineroTransferencia)}</h2>
+                <span class="subMetrica">ventas + cobros de deuda, menos gastos (todo en transferencia)</span>
             </div>
 
             <div class="cardMetrica">
-                <small>🌽 Maíz</small>
-                <h2>${dinero(totalReservaMaiz)}</h2>
-                
+                <small>🌿 Separar Alfa</small>
+                <h2>${dinero(reservaAlfa)}</h2>
+                <span class="subMetrica">${formatearStock(bolsasAlfaVendidas)} bolsas · $5.000 c/u</span>
+            </div>
+
+            <div class="cardMetrica">
+                <small>🌽 Separar Maíz</small>
+                <h2>${dinero(gananciaMaiz)}</h2>
+                <span class="subMetrica">${formatearStock(bolsasMaizVendidas)} bolsas (40/45/50kg)</span>
             </div>
 
         </div>
@@ -296,7 +377,15 @@ function generarReporte(){
                         <strong>Mixto</strong>
                         <small>${ventasMixtas} ventas</small>
                     </div>
-                    <span>${dinero(totalVentasMixtas)}</span>
+                    <span>${dinero(ventasCobradas.filter(v => v.metodoPago === "mixto").reduce((acc,v)=>acc+Number(v.total||0),0))}</span>
+                </div>
+
+                <div class="ventaDashboard" style="border-top:2px dashed #eee;margin-top:8px;padding-top:14px">
+                    <div>
+                        <strong>💳 Cobros de deuda</strong>
+                        <small>${cobrosPeriodo.length} pagos de clientes (E: ${dinero(cobrosEfectivo)} · T: ${dinero(cobrosTransferencia)})</small>
+                    </div>
+                    <span>${dinero(totalCobrado)}</span>
                 </div>
 
             </div>

@@ -1126,7 +1126,14 @@ function registrarVenta(){
         transferencia: 0
     };
 
-    if(metodoPago === "efectivo"){
+    // Si la venta se marca como "DEBE", no se registra plata cobrada
+    // (ni efectivo ni transferencia): el dinero todavía no entró a la
+    // caja, así que en los reportes no debe sumar como si estuviera.
+    if(clienteSeleccionado && estadoVenta === "debe"){
+
+        // pago queda en 0/0 a propósito
+
+    }else if(metodoPago === "efectivo"){
 
         pago.efectivo = total;
 
@@ -1157,13 +1164,19 @@ function registrarVenta(){
 
     }
 
+    // El estado "debe" siempre queda registrado como método de pago
+    // "debe", sin importar qué botón (efectivo/transferencia/mixto)
+    // haya quedado seleccionado antes, para que se distinga bien en
+    // el historial y no se cuente como plata cobrada en los reportes.
+    const metodoPagoFinal = (clienteSeleccionado && estadoVenta === "debe")
+        ? "debe"
+        : metodoPago;
+
     // El stock ya se descontó al cargar cada producto al carrito.
 
-    const nuevaVenta = {
+    historialVentas.unshift({
 
         id: "V" + Date.now(),
-
-        numeroGalpon: obtenerSiguienteNumeroVentaGalpon(),
 
         fecha: new Date().toISOString(),
 
@@ -1191,13 +1204,17 @@ function registrarVenta(){
 
         total,
 
-        metodoPago,
+        metodoPago: metodoPagoFinal,
 
-        pago
+        pago,
 
-    };
+        // Solo las ventas "debe" llevan seguimiento de saldo pendiente;
+        // las demás quedan cobradas de una al momento de la venta.
+        saldoPendiente: (clienteSeleccionado && estadoVenta === "debe") ? total : 0,
 
-    historialVentas.unshift(nuevaVenta);
+        pagada: !(clienteSeleccionado && estadoVenta === "debe")
+
+    });
 
   if(clienteSeleccionado && estadoVenta === "debe"){
 
@@ -1217,9 +1234,6 @@ function registrarVenta(){
     clienteSeleccionado = null;
 
     guardarDatos();
-
-    enviarAvisoGalpon(nuevaVenta);
-
     actualizarTablaVenta();
     actualizarClienteVentaUI();
 

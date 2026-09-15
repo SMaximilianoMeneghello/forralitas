@@ -84,6 +84,7 @@ function renderGastos(){
                             <th>Descripción</th>
                             <th>Categoría</th>
                             <th>Pago</th>
+                            <th>Cargado por</th>
                             <th>Monto</th>
                             <th>Acciones</th>
                         </tr>
@@ -168,7 +169,7 @@ function actualizarTablaGastos(desde = null, hasta = null, texto = ""){
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="tablaVacia">
+                <td colspan="7" class="tablaVacia">
                     Todavía no hay gastos cargados.
                 </td>
             </tr>
@@ -211,7 +212,7 @@ function actualizarTablaGastos(desde = null, hasta = null, texto = ""){
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="tablaVacia">
+                <td colspan="7" class="tablaVacia">
                     No se encontraron gastos con esos filtros.
                 </td>
             </tr>
@@ -235,6 +236,7 @@ function actualizarTablaGastos(desde = null, hasta = null, texto = ""){
                 <td>${gasto.descripcion || "—"}</td>
                 <td>${gasto.categoria || "general"}</td>
                 <td>${etiquetaPago[gasto.metodoPago] || "Efectivo"}</td>
+                <td>${(gasto.vendedor && gasto.vendedor.nombre) || "—"}</td>
                 <td class="saldoDeuda">${dinero(gasto.monto || 0)}</td>
                 <td class="accionesTabla">
                     <button
@@ -404,7 +406,13 @@ function guardarGasto(){
             fecha,
             fechaTexto,
             metodoPago: metodoPagoGasto,
-            pago
+            pago,
+
+            // Para que cada caja quede separada por empleado, igual que
+            // las ventas: este gasto queda a nombre de quien lo cargó.
+            vendedor: usuarioActual
+                ? { usuario: usuarioActual.usuario, nombre: usuarioActual.nombre }
+                : null
 
         });
 

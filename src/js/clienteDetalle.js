@@ -97,50 +97,62 @@ function renderClienteDetalle(id){
 
         <div class="detalleClienteGrid">
 
-            <div class="card datosClienteCard">
+            <div class="columnaClienteIzquierda">
 
-                <h2>Datos del cliente</h2>
+                <div class="card datosClienteCard">
 
-                <div class="datoCliente">
-                    <span class="labelDato">Nombre</span>
-                    <span class="valorDato">${cliente.nombre}</span>
-                </div>
+                    <h2>Datos del cliente</h2>
 
-                <div class="datoCliente">
-                    <span class="labelDato">Dirección</span>
-                    <span class="valorDato">${cliente.direccion || "—"}</span>
-                </div>
-
-                <div class="datoCliente">
-                    <span class="labelDato">Teléfono</span>
-                    <span class="valorDato">${cliente.telefono || "—"}</span>
-                </div>
-
-                <div class="datoCliente">
-                    <span class="labelDato">Saldo</span>
-                    <span class="valorDato ${saldoClass}">${dinero(cliente.saldo || 0)}</span>
-                </div>
-
-                ${cliente.observaciones ? `
                     <div class="datoCliente">
-                        <span class="labelDato">Observaciones</span>
-                        <span class="valorDato">${cliente.observaciones}</span>
+                        <span class="labelDato">Nombre</span>
+                        <span class="valorDato">${cliente.nombre}</span>
                     </div>
-                ` : ""}
 
-                <div class="accionesDetalleCliente">
+                    <div class="datoCliente">
+                        <span class="labelDato">Dirección</span>
+                        <span class="valorDato">${cliente.direccion || "—"}</span>
+                    </div>
 
-                    <button
-                        id="btnPreciosCliente"
-                        class="btnPrecios">
-                        💲 Precios
-                    </button>
+                    <div class="datoCliente">
+                        <span class="labelDato">Teléfono</span>
+                        <span class="valorDato">${cliente.telefono || "—"}</span>
+                    </div>
 
-                    <button
-                        id="btnPagarCliente"
-                        class="btnRegistrarPago">
-                        💵 Registrar pago
-                    </button>
+                    <div class="datoCliente">
+                        <span class="labelDato">Saldo</span>
+                        <span class="valorDato ${saldoClass}">${dinero(cliente.saldo || 0)}</span>
+                    </div>
+
+                    ${cliente.observaciones ? `
+                        <div class="datoCliente">
+                            <span class="labelDato">Observaciones</span>
+                            <span class="valorDato">${cliente.observaciones}</span>
+                        </div>
+                    ` : ""}
+
+                    <div class="accionesDetalleCliente">
+
+                        <button
+                            id="btnPreciosCliente"
+                            class="btnPrecios">
+                            💲 Precios
+                        </button>
+
+                        <button
+                            id="btnPagarCliente"
+                            class="btnRegistrarPago">
+                            💵 Registrar pago
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <div class="card historialPagosCard">
+
+                    <h2>Historial de pagos</h2>
+
+                    ${renderHistorialPagosCliente(cliente)}
 
                 </div>
 
@@ -327,10 +339,68 @@ function filtrarHistorialCliente(clienteId){
 }
 
 /* ==========================================
+   HISTORIAL DE PAGOS DEL CLIENTE
+========================================== */
+
+function renderHistorialPagosCliente(cliente){
+
+    const pagos = cliente.pagos || [];
+
+    if(pagos.length === 0){
+
+        return `<p class="tablaVacia">Todavía no se registraron pagos.</p>`;
+
+    }
+
+    const filas = [...pagos]
+        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+        .map(pago => `
+            <div class="filaPagoCliente">
+                <div>
+                    <strong>${dinero(pago.monto)}</strong>
+                    <small>🗓️ ${pago.fechaTexto}</small>
+                </div>
+                <div class="detallePagoCliente">
+                    <span>Aplicado a la venta del ${pago.ventaFechaTexto || "—"}</span>
+                    <span>Le quedan ${dinero(pago.restanteVenta || 0)} de esa venta</span>
+                </div>
+            </div>
+        `).join("");
+
+    return `<div class="listaPagosCliente">${filas}</div>`;
+
+}
+
+/* ==========================================
    MODAL REGISTRAR PAGO
 ========================================== */
 
 let clientePagoActualId = null;
+let metodoPagoCliente = "efectivo";
+
+function cambiarMetodoPagoCliente(tipo){
+
+    metodoPagoCliente = tipo;
+
+    ["btnEfectivoPagoCliente", "btnTransferenciaPagoCliente", "btnMixtoPagoCliente"].forEach(id =>{
+
+        document.getElementById(id)?.classList.remove("activo");
+
+    });
+
+    const mapaBotones = {
+        efectivo: "btnEfectivoPagoCliente",
+        transferencia: "btnTransferenciaPagoCliente",
+        mixto: "btnMixtoPagoCliente"
+    };
+
+    document.getElementById(mapaBotones[tipo])?.classList.add("activo");
+
+    const pagoMixto = document.getElementById("pagoMixtoPagoCliente");
+
+    if(pagoMixto) pagoMixto.classList.toggle("activo", tipo === "mixto");
+
+}
 
 function abrirModalPagoCliente(id){
 
@@ -344,7 +414,55 @@ function abrirModalPagoCliente(id){
 
     document.getElementById("montoPagoCliente").value = "";
 
-    document.getElementById("tipoPagoCliente").value = "efectivo";
+    limpiar("montoEfectivoPagoCliente", "montoTransferenciaPagoCliente");
+
+    cambiarMetodoPagoCliente("efectivo");
+
+    const ventasPendientes = historialVentas.filter(v =>{
+
+        if(!v.cliente || v.cliente.id !== id) return false;
+
+        if(v.metodoPago !== "debe") return false;
+
+        const pendiente = v.saldoPendiente !== undefined
+            ? Number(v.saldoPendiente)
+            : Number(v.total || 0);
+
+        return pendiente > 0.01;
+
+    }).sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+    const lista = document.getElementById("listaVentasPendientesPago");
+
+    if(ventasPendientes.length === 0){
+
+        lista.innerHTML = `<p class="tablaVacia">Este cliente no tiene ventas pendientes de pago.</p>`;
+
+    }else{
+
+        lista.innerHTML = ventasPendientes.map((v, i) =>{
+
+            const pendiente = v.saldoPendiente !== undefined
+                ? Number(v.saldoPendiente)
+                : Number(v.total || 0);
+
+            return `
+                <label class="filaVentaPendiente">
+                    <input
+                        type="radio"
+                        name="ventaPagoSeleccionada"
+                        value="${v.id}"
+                        ${i === 0 ? "checked" : ""}>
+                    <span>
+                        🗓️ ${v.fechaTexto} — debe <strong>${dinero(pendiente)}</strong>
+                        de ${dinero(v.total)}
+                    </span>
+                </label>
+            `;
+
+        }).join("");
+
+    }
 
     abrir("modalPagoCliente");
 
@@ -360,9 +478,31 @@ function guardarPagoCliente(){
 
     if(!cliente) return;
 
+    const ventaSeleccionada = document.querySelector('input[name="ventaPagoSeleccionada"]:checked');
+
+    if(!ventaSeleccionada){
+
+        notificacion("Este cliente no tiene ventas pendientes para aplicar el pago.", "warning");
+
+        return;
+
+    }
+
+    const venta = historialVentas.find(v => v.id === ventaSeleccionada.value);
+
+    if(!venta){
+
+        notificacion("No se encontró esa venta.", "warning");
+
+        return;
+
+    }
+
     const monto = Number(document.getElementById("montoPagoCliente").value) || 0;
 
-    const tipoPago = document.getElementById("tipoPagoCliente").value;
+    const pendiente = venta.saldoPendiente !== undefined
+        ? Number(venta.saldoPendiente)
+        : Number(venta.total || 0);
 
     if(monto <= 0){
 
@@ -372,19 +512,77 @@ function guardarPagoCliente(){
 
     }
 
-    cliente.saldo = Number(cliente.saldo || 0) - monto;
+    if(monto > pendiente + 0.01){
 
-    registrarEliminacion(
+        notificacion(
+            "Ese pago (" + dinero(monto) + ") es mayor a lo que debe esa venta (" + dinero(pendiente) + "). "
+            + "Elegí otra venta o cargá un monto menor.",
+            "warning"
+        );
 
-        "Pago de cliente",
+        return;
 
-        "Pago de " + cliente.nombre
-        + " · " + dinero(monto)
-        + " · " + tipoPago,
+    }
 
-        { clienteId: cliente.id, monto, tipoPago }
+    // Desglose efectivo/transferencia, igual que en ventas y gastos,
+    // para que esta plata se sume después en la Caja (Reportes).
+    let pago = { efectivo: 0, transferencia: 0 };
 
-    );
+    if(metodoPagoCliente === "efectivo"){
+
+        pago.efectivo = monto;
+
+    }else if(metodoPagoCliente === "transferencia"){
+
+        pago.transferencia = monto;
+
+    }else{
+
+        pago.efectivo = Number(document.getElementById("montoEfectivoPagoCliente").value) || 0;
+        pago.transferencia = Number(document.getElementById("montoTransferenciaPagoCliente").value) || 0;
+
+        const suma = pago.efectivo + pago.transferencia;
+
+        if(Math.abs(suma - monto) > 0.01){
+
+            notificacion(
+                "Los montos del pago mixto deben sumar " + dinero(monto) + ".",
+                "warning"
+            );
+
+            return;
+
+        }
+
+    }
+
+    const restante = Math.max(0, pendiente - monto);
+
+    venta.saldoPendiente = restante;
+    venta.pagada = restante <= 0.01;
+
+    cliente.saldo = Math.max(0, Number(cliente.saldo || 0) - monto);
+
+    if(!cliente.pagos) cliente.pagos = [];
+
+    cliente.pagos.push({
+
+        fecha: new Date().toISOString(),
+        fechaTexto: fechaHoraTexto(new Date()),
+        monto,
+        tipoPago: metodoPagoCliente,
+        pago,
+        ventaId: venta.id,
+        ventaFechaTexto: venta.fechaTexto,
+        restanteVenta: restante,
+
+        // Para que la Caja separe esta plata por empleado, igual que
+        // ventas y gastos.
+        vendedor: usuarioActual
+            ? { usuario: usuarioActual.usuario, nombre: usuarioActual.nombre }
+            : null
+
+    });
 
     guardarDatos();
 
@@ -394,6 +592,10 @@ function guardarPagoCliente(){
 
     clientePagoActualId = null;
 
-    notificacion("Pago registrado correctamente.");
+    notificacion(
+        restante <= 0.01
+            ? "¡Venta saldada! Quedó marcada como pagada."
+            : "Pago registrado. Quedan " + dinero(restante) + " de esa venta."
+    );
 
 }
