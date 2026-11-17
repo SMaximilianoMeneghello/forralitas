@@ -213,12 +213,12 @@ const cuenta = {
     // Espera a saber si en esta PC ya había una cuenta ingresada.
     async esperarInicial(msMaximo = 6000){
 
-        const u = await Promise.race([
+        await Promise.race([
             sesionInicial,
-            new Promise(r => setTimeout(() => r(auth.currentUser), msMaximo))
+            new Promise(r => setTimeout(r, msMaximo))
         ]);
 
-        return datosCuenta(u);
+        return datosCuenta(auth.currentUser);
 
     },
 

@@ -1,0 +1,37 @@
+rules_version = '2';
+
+// ==========================================================
+// REGLAS DE SEGURIDAD DE FIRESTORE
+// ----------------------------------------------------------
+// Dónde se pegan: consola de Firebase → Firestore Database →
+// pestaña "Reglas" → pegar todo este archivo → "Publicar".
+// (Ver la guía COMO_OFRECER_EL_SISTEMA_A_OTROS_NEGOCIOS.md)
+// ==========================================================
+
+service cloud.firestore {
+
+  match /databases/{database}/documents {
+
+    // NEGOCIOS CON CUENTA
+    // Cada negocio guarda sus datos en negocios/{id de su cuenta}.
+    // Solo puede leerlos y escribirlos quien ingresó con ESA cuenta
+    // (email y clave). Un negocio nunca puede ver los datos de otro.
+    match /negocios/{uid}/datos/{documento} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // MODO CLÁSICO (la instalación original, sin cuenta)
+    // Mientras exista este bloque, cualquiera que tenga el programa
+    // puede leer y escribir estos datos. Cuando el negocio original
+    // se haya pasado a cuenta (Configuración → "Proteger los datos con
+    // una cuenta") y todas sus PCs hayan ingresado con ella, BORRAR
+    // este bloque completo y volver a publicar.
+    match /forralitasDatos/{documento} {
+      allow read, write: if true;
+    }
+
+    // Todo lo demás queda bloqueado.
+
+  }
+
+}
