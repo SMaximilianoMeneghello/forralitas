@@ -83,6 +83,8 @@ function crearPC(coleccion, opciones = {}){
         pc.gestor = ctx.crearGestorSync({
             adaptador, almacen: pc.almacen, tablas: defs,
             limiteBytes: opciones.limite,
+            maxBytesLote: opciones.maxBytesLote,
+            maxBytesEnvio: opciones.maxBytesEnvio,
             alCambiar: () =>{ pc.cambios++; }
         });
         await pc.gestor.iniciar({ tiempoMaximo: opciones.tiempoMaximo || 5000 });
@@ -323,6 +325,32 @@ test("subida inicial de una tabla enorme (migración) queda repartida", async ()
     await A.sincronizado();
     const B = await crearPC(c, { limite: 8000 }).arrancar();
     assert.deepEqual(ids(B.datos.ventas), ids(lista));
+});
+
+test("un cambio enorme se sube en varias tandas y queda en orden", async () =>{
+    const c = col("tandas");
+    const o = { limite: 8000, maxBytesLote: 5000, maxBytesEnvio: 9000 };
+    const A = await crearPC(c, o).arrancar();
+    A.datos.ventas.unshift(venta(1));
+    A.datos.productos.push({ id: "P1", stock: 5 });
+    A.guardar(); await A.sincronizado();
+    // De golpe: 400 ventas nuevas al principio, una edición, y productos al final.
+    const nuevas = [];
+    for(let i = 401; i >= 2; i--) nuevas.push(venta(i));
+    A.datos.ventas = nuevas.concat(A.datos.ventas);
+    A.datos.ventas[A.datos.ventas.length - 1].total = 77;
+    for(let i = 2; i <= 150; i++) A.datos.productos.push({ id: "P" + i, stock: i, texto: "y".repeat(100) });
+    A.guardar();
+    assert.ok((await A.almacen.leer("cola:ventas")).length > 5, "el cambio grande se divide en varios lotes");
+    await A.sincronizado();
+    const esperado = ids(A.datos.ventas);
+    assert.equal(esperado.length, 401);
+    assert.equal(esperado[0], "V00401");
+    const B = await crearPC(c, o).arrancar();
+    assert.deepEqual(ids(B.datos.ventas), esperado);
+    assert.equal(B.datos.ventas[400].total, 77);
+    assert.deepEqual(ids(B.datos.productos), ids(A.datos.productos));
+    assert.equal(B.datos.productos.length, 150);
 });
 
 test("una versión vieja del programa pisa el documento principal: no se pierden las partes", async () =>{

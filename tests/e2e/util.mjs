@@ -76,6 +76,7 @@ export async function aceptarConfirmacion(pagina){
 export async function crearProducto(pagina, p){
     await pagina.click("#Productos");
     await pagina.click("#btnAgregarProducto");
+    await pagina.waitForTimeout(180); // el formulario pone el foco en el nombre al abrirse
     await pagina.fill("#nombreProducto", p.nombre);
     await pagina.fill("#categoriaProducto", p.categoria || "");
     await pagina.fill("#pesoBolsa", String(p.peso));
@@ -92,6 +93,7 @@ export async function crearProducto(pagina, p){
 export async function crearCliente(pagina, c){
     await pagina.click("#Clientes");
     await pagina.click("#btnAgregarCliente");
+    await pagina.waitForTimeout(180);
     await pagina.fill("#nombreCliente", c.nombre);
     await pagina.fill("#telefonoCliente", c.telefono || "");
     if(c.saldo !== undefined) await pagina.fill("#saldoCliente", String(c.saldo));

@@ -35,6 +35,12 @@ window.crearGestorSync = function(cfg){
     const LIMITE = cfg.limiteBytes || 450000;
     const MAX_LOTES = 40;
 
+    // Firestore no acepta envíos de más de 10 MB: los cambios muy grandes
+    // (por ejemplo importar una copia o la primera subida de un historial
+    // de años) se dividen en lotes y se suben en varias tandas.
+    const MAX_BYTES_LOTE = cfg.maxBytesLote || 1500000;
+    const MAX_BYTES_ENVIO = cfg.maxBytesEnvio || 3000000;
+
     const tablas = new Map();
 
     let detenido = false;
@@ -129,6 +135,80 @@ window.crearGestorSync = function(cfg){
         clearTimeout(t.temporizador);
 
         t.temporizador = setTimeout(() => encolar(t, () => sincronizar(t)), ms);
+
+    }
+
+    /* Agrega a la cola los cambios "ops", divididos si son muy grandes. */
+    function encolarOps(t, ops){
+
+        dividirOps(ops).forEach(parte =>{
+
+            t.cola.push({ id: nuevoIdLote(), ops: parte, b: JSON.stringify(parte).length });
+
+        });
+
+    }
+
+    function dividirOps(ops){
+
+        if(!ops || ops.t !== "lista") return [ops];
+
+        const agregados = ops.ops.add || [];
+
+        if(agregados.length < 2) return [ops];
+
+        const tamanos = agregados.map(a => JSON.stringify(a).length);
+
+        if(tamanos.reduce((x, y) => x + y, 0) <= MAX_BYTES_LOTE) return [ops];
+
+        const trozar = (quiereInicio) =>{
+
+            const trozos = [];
+
+            let actual = [];
+            let bytes = 0;
+
+            agregados.forEach((a, i) =>{
+
+                if(!!a.ini !== quiereInicio) return;
+
+                if(actual.length && bytes + tamanos[i] > MAX_BYTES_LOTE){
+
+                    trozos.push(actual);
+
+                    actual = [];
+                    bytes = 0;
+
+                }
+
+                actual.push(a);
+
+                bytes += tamanos[i];
+
+            });
+
+            if(actual.length) trozos.push(actual);
+
+            return trozos;
+
+        };
+
+        const armar = (add, mod, del) => ({ t: "lista", c: ops.c, ops: { add, mod, del } });
+
+        const partes = [];
+
+        const mod = ops.ops.mod || [];
+        const del = ops.ops.del || [];
+
+        if(mod.length || del.length) partes.push(armar([], mod, del));
+
+        // Los que van al principio se envían de atrás para adelante, así
+        // al terminar quedan en el mismo orden que en esta PC.
+        trozar(true).reverse().forEach(tr => partes.push(armar(tr, [], [])));
+
+        trozar(false).forEach(tr => partes.push(armar(tr, [], [])));
+
+        return partes;
 
     }
 
@@ -258,7 +338,7 @@ window.crearGestorSync = function(cfg){
 
         if(!ops) return false;
 
-        t.cola.push({ id: nuevoIdLote(), ops });
+        encolarOps(t, ops);
 
         persistirCola(t);
 
@@ -330,33 +410,33 @@ window.crearGestorSync = function(cfg){
 
         partes.set("m", Array.isArray(data.datos) ? data.datos : []);
 
-        for(const id of meta.orden){
+        const idsPartes = meta.orden.filter(id => id !== "m");
 
-            if(id === "m") continue;
+        const jsons = await Promise.all(idsPartes.map(async id =>{
 
             const enCache = t.remoto ? t.remoto.partesJson.get(id) : undefined;
-
-            let json;
 
             if(enCache !== undefined
                 && meta.verPartes[id] !== undefined
                 && t.remoto.verPartes[id] === meta.verPartes[id]){
 
                 // La parte no cambió desde la última vez: no se vuelve a bajar.
-                json = enCache;
-
-            }else{
-
-                const d = await leer(t.def.nombre + "__" + id);
-
-                json = JSON.stringify(d && Array.isArray(d.datos) ? d.datos : []);
+                return enCache;
 
             }
 
-            partesJson.set(id, json);
-            partes.set(id, JSON.parse(json));
+            const d = await leer(t.def.nombre + "__" + id);
 
-        }
+            return JSON.stringify(d && Array.isArray(d.datos) ? d.datos : []);
+
+        }));
+
+        idsPartes.forEach((id, i) =>{
+
+            partesJson.set(id, jsons[i]);
+            partes.set(id, JSON.parse(jsons[i]));
+
+        });
 
         const e = N.ensamblar(meta.orden, partes, t.def.clave);
 
@@ -447,7 +527,7 @@ window.crearGestorSync = function(cfg){
 
             nuevoLocal = N.aplicarValor(nuevaRef, abierto);
 
-            t.cola.push({ id: nuevoIdLote(), ops: abierto });
+            encolarOps(t, abierto);
 
         }
 
@@ -512,7 +592,22 @@ window.crearGestorSync = function(cfg){
         // cuando llegue, se dispara solo.
         if(!t.confirmado) return;
 
-        const enviados = t.cola.slice();
+        // Se envía lo que entre en una tanda; el resto sigue enseguida.
+        const enviados = [];
+
+        let bytesEnvio = 0;
+
+        for(const l of t.cola){
+
+            const b = l.b || JSON.stringify(l.ops).length;
+
+            if(enviados.length && bytesEnvio + b > MAX_BYTES_ENVIO) break;
+
+            enviados.push(l);
+
+            bytesEnvio += b;
+
+        }
 
         t.enviando = true;
 
