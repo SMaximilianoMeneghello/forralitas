@@ -91,11 +91,16 @@ function guardarConexion(c){
     if(c) localStorage.setItem("conexionNegocio", JSON.stringify(c));
     else localStorage.removeItem("conexionNegocio");
 
+    // Una PC que alguna vez usó cuenta nunca vuelve sola al modo sin cuenta.
+    if(c && c.modo === "cuenta") localStorage.setItem("negocioConCuenta", "1");
+
 }
 
 /* Una PC que ya venía usando el programa tiene datos guardados
    del modo clásico: sigue funcionando igual que siempre. */
 function hayDatosLocalesClasicos(){
+
+    if(localStorage.getItem("negocioConCuenta") === "1") return false;
 
     return ["usuarios", "productos", "historialVentas", "clientes"]
         .some(k => localStorage.getItem(k) !== null);
@@ -216,6 +221,29 @@ async function conectarYArrancar(conexion){
         });
 
         return;
+
+    }
+
+    // Si el negocio se pasa a cuenta mientras esta PC está abierta, se
+    // corta acá mismo para no seguir cargando datos en el lugar viejo.
+    if(adaptador && conexion.modo === "clasico"){
+
+        adaptador.escuchar("_migrado", (data, meta) =>{
+
+            if(!data || (meta && meta.deCache) || conexionActual !== conexion) return;
+
+            if(gestorSync) gestorSync.detener();
+
+            usuarioActual = null;
+
+            document.querySelectorAll(".modal").forEach(m => m.classList.add("oculto"));
+
+            mostrarPantallaConexion({
+                sinClasico: true,
+                aviso: "Este negocio ahora usa una cuenta. Ingresá el email y la clave del negocio en esta PC."
+            });
+
+        }, () => {});
 
     }
 
@@ -600,6 +628,10 @@ function migrarDatos(){
         });
 
         hechas.separarPorProducto = true;
+
+        // Las ventas viejas de productos ya eliminados siguen usando
+        // las reglas anteriores en la Caja (ver reportes.js).
+        hechas.reglasSepararAnteriores = true;
 
         cambios = true;
 

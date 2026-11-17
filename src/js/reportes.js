@@ -1,17 +1,23 @@
 /* ==========================================
-   REPORTES
+   CAJA (REPORTES)
 ========================================== */
+
+function puedeVerCajaCompleta(){
+
+    return puede("verCajaCompleta");
+
+}
 
 function renderReportes(){
 
-    const filtroEmpleadoHtml = esAdmin()
+    const filtroEmpleadoHtml = puedeVerCajaCompleta()
         ? `
             <div class="grupoInput">
                 <label>Empleado</label>
                 <select id="empleadoReporte">
                     <option value="">Todos los empleados</option>
                     ${obtenerListaEmpleadosParaFiltro()
-                        .map(nombre => `<option value="${nombre}">${nombre}</option>`)
+                        .map(nombre => `<option value="${esc(nombre)}">${esc(nombre)}</option>`)
                         .join("")}
                 </select>
             </div>
@@ -40,13 +46,19 @@ function renderReportes(){
 
                 <button class="btnHoy" id="btnHoyReporte">Hoy</button>
 
+                <button class="btnTodas" id="btnMesReporte">Este mes</button>
+
+                <button class="btnSecundario" id="btnImprimirReporte">🖨️ Imprimir</button>
+
+                <button class="btnSecundario" id="btnExportarReporte">⬇ Excel</button>
+
             </div>
 
             ${
-                !esAdmin()
+                !puedeVerCajaCompleta()
                 ? `<p class="notaEliminaciones" style="margin-bottom:16px">
-                        Este reporte muestra únicamente tus propias ventas
-                        (${usuarioActual ? usuarioActual.nombre : ""}), para que
+                        Esta caja muestra únicamente lo que cargaste vos
+                        (${esc(usuarioActual ? usuarioActual.nombre : "")}), para que
                         no se mezcle con lo registrado por otras personas.
                    </p>`
                 : ""
@@ -62,13 +74,28 @@ function renderReportes(){
 
     document.getElementById("btnHoyReporte").onclick = filtrarHoyReporte;
 
-    const hoy = fechaLocalISO(new Date());
+    document.getElementById("btnMesReporte").onclick = ()=>{
 
-    document.getElementById("fechaDesdeReporte").value = hoy;
+        const hoy = new Date();
 
-    document.getElementById("fechaHastaReporte").value = hoy;
+        document.getElementById("fechaDesdeReporte").value =
+            fechaLocalISO(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
 
-    generarReporte();
+        document.getElementById("fechaHastaReporte").value = fechaLocalISO(hoy);
+
+        generarReporte();
+
+    };
+
+    document.getElementById("btnImprimirReporte").onclick = imprimirReporte;
+
+    document.getElementById("btnExportarReporte").onclick = exportarReporteCSV;
+
+    const selEmpleado = document.getElementById("empleadoReporte");
+
+    if(selEmpleado) selEmpleado.onchange = generarReporte;
+
+    filtrarHoyReporte();
 
 }
 
@@ -84,229 +111,204 @@ function filtrarHoyReporte(){
 
 }
 
-function generarReporte(){
+/* ==========================================
+   CÁLCULO DE LA CAJA DE UN PERÍODO
+========================================== */
 
-    const desde = document.getElementById("fechaDesdeReporte").value;
+// Reglas que antes estaban fijas en el programa. Solo se usan para
+// ventas viejas de productos que ya no existen (ver migrarDatos).
+const REGLAS_SEPARAR_ANTERIORES = {
+    "MAIZX40KG": { monto: 11000, grupo: "Maíz" },
+    "MAIZX45KG": { monto: 12000, grupo: "Maíz" },
+    "MAIZX50KG": { monto: 12000, grupo: "Maíz" },
+    "ALFAVERDE": { monto: 5000, grupo: "Alfa" }
+};
 
-    const hasta = document.getElementById("fechaHastaReporte").value;
+/* Cuánto hay que "separar" (reservar para reponer mercadería) por
+   cada bolsa vendida de este producto. */
+function separarDeItem(item){
 
-    // Un empleado (no admin) siempre ve nada más que sus propias ventas,
-    // para que la caja no se mezcle con lo que vendió otra persona.
-    // El admin puede ver todo, o elegir un empleado puntual.
-    const empleadoSeleccionado = esAdmin()
-        ? (document.getElementById("empleadoReporte")?.value || "")
-        : (usuarioActual ? usuarioActual.nombre : "");
+    if(item.modo !== "bolsa") return null;
 
-    const ventas = historialVentas.filter(v =>{
+    if(item.separar !== undefined){
 
-        const f = fechaLocalISO(v.fecha);
-
-        if(desde && f < desde) return false;
-
-        if(hasta && f > hasta) return false;
-
-        if(empleadoSeleccionado && (v.vendedor && v.vendedor.nombre) !== empleadoSeleccionado) return false;
-
-        return true;
-
-    });
-
-    const gastosPeriodo = gastos.filter(g =>{
-
-        const f = g.fecha || "";
-
-        if(desde && f < desde) return false;
-
-        if(hasta && f > hasta) return false;
-
-        // Mismo criterio que las ventas: si hay un empleado puntual
-        // seleccionado (o el que inició sesión no es admin), la caja
-        // de gastos también queda separada por empleado. Los gastos
-        // viejos sin usuario asignado solo se ven en la vista "Todos".
-        if(empleadoSeleccionado && (g.vendedor && g.vendedor.nombre) !== empleadoSeleccionado) return false;
-
-        return true;
-
-    });
-
-    // Cobros de deudas de clientes (pagos de ventas "fiado"): esta plata
-    // entra a la caja el día que se COBRA, no el día de la venta original.
-    const cobrosPeriodo = clientes.flatMap(c => (c.pagos || []).map(p => ({ ...p, cliente: c.nombre })))
-        .filter(p =>{
-
-            const f = fechaLocalISO(p.fecha);
-
-            if(desde && f < desde) return false;
-
-            if(hasta && f > hasta) return false;
-
-            if(empleadoSeleccionado && (p.vendedor && p.vendedor.nombre) !== empleadoSeleccionado) return false;
-
-            return true;
-
-        });
-
-    const totalCobrado = cobrosPeriodo.reduce((acc, p) => acc + Number(p.monto || 0), 0);
-
-    const cobrosEfectivo = cobrosPeriodo
-        .reduce((acc, p) => acc + (p.pago ? Number(p.pago.efectivo || 0) : Number(p.monto || 0)), 0);
-
-    const cobrosTransferencia = cobrosPeriodo
-        .reduce((acc, p) => acc + (p.pago ? Number(p.pago.transferencia || 0) : 0), 0);
-
-    // Las ventas marcadas "DEBE" todavía no se cobraron: no cuentan
-    // como plata real en Total Ventas / métodos de pago. (Los pagos que
-    // se van cobrando después de una venta fiada se ven en el historial
-    // de pagos de cada cliente, todavía no se suman acá al período).
-    const ventasCobradas = ventas.filter(v => v.metodoPago !== "debe");
-
-    const totalVentas = ventasCobradas.reduce((acc, v) => acc + Number(v.total || 0), 0);
-
-    const totalGastos = gastosPeriodo.reduce((acc, g) => acc + Number(g.monto || 0), 0);
-
-    // Se suma lo que realmente entró en efectivo/transferencia de CADA
-    // venta (incluida la parte que corresponde de las ventas con pago
-    // mixto), y se le resta lo que salió en gastos con ese mismo método.
-    const ventasEfectivo = ventasCobradas
-        .reduce((acc, v) => acc + Number((v.pago && v.pago.efectivo) || 0), 0);
-
-    const ventasTransferencia = ventasCobradas
-        .reduce((acc, v) => acc + Number((v.pago && v.pago.transferencia) || 0), 0);
-
-    const gastosEfectivo = gastosPeriodo
-        .reduce((acc, g) => acc + (g.pago ? Number(g.pago.efectivo || 0) : Number(g.monto || 0)), 0);
-
-    const gastosTransferencia = gastosPeriodo
-        .reduce((acc, g) => acc + (g.pago ? Number(g.pago.transferencia || 0) : 0), 0);
-
-    const dineroEfectivo = ventasEfectivo + cobrosEfectivo - gastosEfectivo;
-
-    const dineroTransferencia = ventasTransferencia + cobrosTransferencia - gastosTransferencia;
-
-    const ventasMixtas = ventasCobradas.filter(v => v.metodoPago === "mixto").length;
-
-    const ventasPorCliente = {};
-
-    ventas.forEach(v =>{
-
-        const nombre = (v.cliente && v.cliente.nombre) || "Consumidor Final";
-
-        ventasPorCliente[nombre] = (ventasPorCliente[nombre] || 0) + Number(v.total || 0);
-
-    });
-
-    const topClientes = Object.entries(ventasPorCliente)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8);
-
-    const productoMasVendido = {};
-
-    ventas.forEach(v =>{
-
-        (v.productos || []).forEach(item =>{
-
-            const nombre = item.nombre || "(sin nombre)";
-
-            productoMasVendido[nombre] = (productoMasVendido[nombre] || 0)
-                + Number(item.bolsas || 0);
-
-        });
-
-    });
-
-    const topProductos = Object.entries(productoMasVendido)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8);
-
-    /* ==========================================
-       GANANCIA POR MAÍZ (solo bolsas, no suelto)
-       ------------------------------------------
-       Solo estos 3 productos exactos cuentan
-       (cualquier otro maíz —pisingallo, amarillo,
-       blanco, etc.— queda afuera), y solo cuando
-       se vendieron por bolsa entera, no sueltos
-       por kilo ni por monto en dinero.
-    ========================================== */
-
-    const GANANCIA_MAIZ_POR_BOLSA = {
-
-        "MAIZX40KG": 11000,
-        "MAIZX45KG": 12000,
-        "MAIZX50KG": 12000
-
-    };
-
-    function normalizarNombreProducto(nombre){
-
-        return (nombre || "").toUpperCase().replace(/\s+/g, "");
+        return Number(item.separar) > 0
+            ? { monto: Number(item.separar), grupo: item.grupoSeparar || item.nombre }
+            : null;
 
     }
 
-    let gananciaMaiz = 0;
-    let bolsasMaizVendidas = 0;
+    const producto = productos.find(p => p.id === item.id);
+
+    if(producto){
+
+        return Number(producto.separarPorBolsa) > 0
+            ? { monto: Number(producto.separarPorBolsa), grupo: producto.grupoSeparar || producto.nombre }
+            : null;
+
+    }
+
+    if(configuracionSistema.migraciones && configuracionSistema.migraciones.reglasSepararAnteriores){
+
+        return REGLAS_SEPARAR_ANTERIORES[normalizarNombreProducto(item.nombre)] || null;
+
+    }
+
+    return null;
+
+}
+
+function costoDeItem(item){
+
+    if(item.costo !== undefined) return Number(item.costo) || 0;
+
+    const producto = productos.find(p => p.id === item.id);
+
+    return producto ? (Number(producto.costoBolsa) || 0) : 0;
+
+}
+
+function calcularCaja(desde, hasta, empleado){
+
+    const enPeriodo = (f) => !(desde && f < desde) && !(hasta && f > hasta);
+
+    const deEmpleado = (reg) => !empleado || (reg.vendedor && reg.vendedor.nombre) === empleado;
+
+    const ventas = historialVentas.filter(v => enPeriodo(fechaLocalISO(v.fecha)) && deEmpleado(v));
+
+    // Los gastos viejos sin usuario asignado solo se ven en la vista "Todos".
+    const gastosPeriodo = gastos.filter(g => enPeriodo(g.fecha || "") && deEmpleado(g));
+
+    // Cobros de deudas de clientes: esta plata entra a la caja el día
+    // que se COBRA, no el día de la venta original.
+    const cobros = clientes
+        .flatMap(c => (c.pagos || []).map(p => ({ ...p, cliente: c.nombre })))
+        .filter(p => enPeriodo(fechaLocalISO(p.fecha)) && deEmpleado(p));
+
+    const sumar = (lista, fn) => redondear(lista.reduce((acc, x) => acc + (Number(fn(x)) || 0), 0), 2);
+
+    // Las ventas marcadas "DEBE" todavía no se cobraron: no cuentan
+    // como plata real en Total Ventas / métodos de pago.
+    const ventasCobradas = ventas.filter(v => v.metodoPago !== "debe");
+
+    const ventasFiadas = ventas.filter(v => v.metodoPago === "debe");
+
+    const ventasEfectivo = sumar(ventasCobradas, v => v.pago && v.pago.efectivo);
+
+    const ventasTransferencia = sumar(ventasCobradas, v => v.pago && v.pago.transferencia);
+
+    const cobrosEfectivo = sumar(cobros, p => p.pago ? p.pago.efectivo : p.monto);
+
+    const cobrosTransferencia = sumar(cobros, p => p.pago ? p.pago.transferencia : 0);
+
+    const gastosEfectivo = sumar(gastosPeriodo, g => g.pago ? g.pago.efectivo : g.monto);
+
+    const gastosTransferencia = sumar(gastosPeriodo, g => g.pago ? g.pago.transferencia : 0);
+
+    const porCliente = {};
+    const porProducto = {};
+    const separar = {};
+
+    let ganancia = 0;
+    let ventasConCosto = 0;
 
     ventas.forEach(v =>{
 
+        const nombre = nombreClienteVenta(v);
+
+        porCliente[nombre] = (porCliente[nombre] || 0) + Number(v.total || 0);
+
+        let tieneCosto = false;
+
         (v.productos || []).forEach(item =>{
 
-            if(item.modo !== "bolsa") return;
+            const nombreProducto = item.nombre || "(sin nombre)";
 
-            const clave = normalizarNombreProducto(item.nombre);
+            porProducto[nombreProducto] = (porProducto[nombreProducto] || 0) + Number(item.bolsas || 0);
 
-            const gananciaPorBolsa = GANANCIA_MAIZ_POR_BOLSA[clave];
+            const regla = separarDeItem(item);
 
-            if(gananciaPorBolsa === undefined) return;
+            if(regla){
 
-            const cantidadBolsas = Number(item.cantidad || item.bolsas || 0);
+                const bolsas = Number(item.cantidad || item.bolsas || 0);
 
-            gananciaMaiz += cantidadBolsas * gananciaPorBolsa;
+                if(!separar[regla.grupo]) separar[regla.grupo] = { monto: 0, bolsas: 0 };
 
-            bolsasMaizVendidas += cantidadBolsas;
+                separar[regla.grupo].monto += bolsas * regla.monto;
+                separar[regla.grupo].bolsas += bolsas;
+
+            }
+
+            const costo = costoDeItem(item);
+
+            if(costo > 0){
+
+                ganancia += Number(item.subtotal || 0) - costo * Number(item.bolsas || 0);
+
+                tieneCosto = true;
+
+            }
 
         });
 
+        if(tieneCosto) ventasConCosto++;
+
     });
 
-    /* ==========================================
-       SEPARAR ALFA
-       Se aparta $5.000 por cada bolsa de Alfa
-       Verde vendida, para reponer mercadería.
-    ========================================== */
-
-    const RESERVA_ALFA_POR_BOLSA = {
-
-        "ALFAVERDE": 5000
-
+    return {
+        ventas,
+        ventasCobradas,
+        ventasFiadas,
+        gastosPeriodo,
+        cobros,
+        totalVentas: sumar(ventasCobradas, v => v.total),
+        totalFiado: sumar(ventasFiadas, v => v.total),
+        totalGastos: sumar(gastosPeriodo, g => g.monto),
+        totalCobrado: sumar(cobros, p => p.monto),
+        ventasEfectivo,
+        ventasTransferencia,
+        cobrosEfectivo,
+        cobrosTransferencia,
+        gastosEfectivo,
+        gastosTransferencia,
+        dineroEfectivo: redondear(ventasEfectivo + cobrosEfectivo - gastosEfectivo, 2),
+        dineroTransferencia: redondear(ventasTransferencia + cobrosTransferencia - gastosTransferencia, 2),
+        totalMixto: sumar(ventasCobradas.filter(v => v.metodoPago === "mixto"), v => v.total),
+        topClientes: Object.entries(porCliente).sort((a, b) => b[1] - a[1]).slice(0, 8),
+        topProductos: Object.entries(porProducto).sort((a, b) => b[1] - a[1]).slice(0, 8),
+        separar: Object.entries(separar).sort((a, b) => b[1].monto - a[1].monto),
+        ganancia: redondear(ganancia, 2),
+        ventasConCosto
     };
 
-    let reservaAlfa = 0;
-    let bolsasAlfaVendidas = 0;
+}
 
-    ventas.forEach(v =>{
+function filtrosReporteActuales(){
 
-        (v.productos || []).forEach(item =>{
+    const desde = document.getElementById("fechaDesdeReporte")?.value || "";
 
-            if(item.modo !== "bolsa") return;
+    const hasta = document.getElementById("fechaHastaReporte")?.value || "";
 
-            const clave = normalizarNombreProducto(item.nombre);
+    // Un empleado sin permiso ve nada más que su propia caja.
+    const empleado = puedeVerCajaCompleta()
+        ? (document.getElementById("empleadoReporte")?.value || "")
+        : (usuarioActual ? usuarioActual.nombre : "");
 
-            const reservaPorBolsa = RESERVA_ALFA_POR_BOLSA[clave];
+    return { desde, hasta, empleado };
 
-            if(reservaPorBolsa === undefined) return;
+}
 
-            const cantidadBolsas = Number(item.cantidad || item.bolsas || 0);
-
-            reservaAlfa += cantidadBolsas * reservaPorBolsa;
-
-            bolsasAlfaVendidas += cantidadBolsas;
-
-        });
-
-    });
+function generarReporte(){
 
     const cont = document.getElementById("contenidoReporte");
 
     if(!cont) return;
+
+    const { desde, hasta, empleado } = filtrosReporteActuales();
+
+    const c = calcularCaja(desde, hasta, empleado);
+
+    const contar = (metodo) => c.ventas.filter(v => v.metodoPago === metodo).length;
 
     cont.innerHTML = `
 
@@ -314,39 +316,51 @@ function generarReporte(){
 
             <div class="cardMetrica">
                 <small>💰 Venta Total</small>
-                <h2>${dinero(totalVentas)}</h2>
-                <span class="subMetrica">${ventasCobradas.length} ventas</span>
+                <h2>${dinero(c.totalVentas)}</h2>
+                <span class="subMetrica">${c.ventasCobradas.length} ventas cobradas</span>
             </div>
 
             <div class="cardMetrica">
                 <small>💸 Total de gastos</small>
-                <h2>${dinero(totalGastos)}</h2>
-                <span class="subMetrica">${gastosPeriodo.length} gastos</span>
+                <h2>${dinero(c.totalGastos)}</h2>
+                <span class="subMetrica">${c.gastosPeriodo.length} gastos</span>
             </div>
 
             <div class="cardMetrica">
                 <small>💵 Dinero en efectivo</small>
-                <h2>${dinero(dineroEfectivo)}</h2>
+                <h2>${dinero(c.dineroEfectivo)}</h2>
                 <span class="subMetrica">ventas + cobros de deuda, menos gastos (todo en efectivo)</span>
             </div>
 
             <div class="cardMetrica">
                 <small>🏦 Dinero en transferencia</small>
-                <h2>${dinero(dineroTransferencia)}</h2>
+                <h2>${dinero(c.dineroTransferencia)}</h2>
                 <span class="subMetrica">ventas + cobros de deuda, menos gastos (todo en transferencia)</span>
             </div>
 
+            ${c.totalFiado > 0 ? `
             <div class="cardMetrica">
-                <small>🌿 Separar Alfa</small>
-                <h2>${dinero(reservaAlfa)}</h2>
-                <span class="subMetrica">${formatearStock(bolsasAlfaVendidas)} bolsas · $5.000 c/u</span>
+                <small>📝 Vendido fiado</small>
+                <h2>${dinero(c.totalFiado)}</h2>
+                <span class="subMetrica">${c.ventasFiadas.length} ventas "DEBE" (no cuentan como plata cobrada)</span>
             </div>
+            ` : ""}
 
+            ${c.separar.map(([grupo, d]) => `
             <div class="cardMetrica">
-                <small>🌽 Separar Maíz</small>
-                <h2>${dinero(gananciaMaiz)}</h2>
-                <span class="subMetrica">${formatearStock(bolsasMaizVendidas)} bolsas (40/45/50kg)</span>
+                <small>🌾 Separar ${esc(grupo)}</small>
+                <h2>${dinero(d.monto)}</h2>
+                <span class="subMetrica">${formatearStock(d.bolsas)} bolsas vendidas</span>
             </div>
+            `).join("")}
+
+            ${esAdmin() && c.ventasConCosto > 0 ? `
+            <div class="cardMetrica">
+                <small>📈 Ganancia estimada</small>
+                <h2>${dinero(c.ganancia)}</h2>
+                <span class="subMetrica">sobre los productos que tienen costo cargado</span>
+            </div>
+            ` : ""}
 
         </div>
 
@@ -359,33 +373,41 @@ function generarReporte(){
                 <div class="ventaDashboard">
                     <div>
                         <strong>Efectivo</strong>
-                        <small>${ventas.filter(v => v.metodoPago === "efectivo").length} ventas</small>
+                        <small>${contar("efectivo")} ventas</small>
                     </div>
-                    <span>${dinero(ventasEfectivo)}</span>
+                    <span>${dinero(c.ventasEfectivo)}</span>
                 </div>
 
                 <div class="ventaDashboard">
                     <div>
                         <strong>Transferencia</strong>
-                        <small>${ventas.filter(v => v.metodoPago === "transferencia").length} ventas</small>
+                        <small>${contar("transferencia")} ventas</small>
                     </div>
-                    <span>${dinero(ventasTransferencia)}</span>
+                    <span>${dinero(c.ventasTransferencia)}</span>
                 </div>
 
                 <div class="ventaDashboard">
                     <div>
                         <strong>Mixto</strong>
-                        <small>${ventasMixtas} ventas</small>
+                        <small>${contar("mixto")} ventas (ya repartido arriba entre efectivo y transferencia)</small>
                     </div>
-                    <span>${dinero(ventasCobradas.filter(v => v.metodoPago === "mixto").reduce((acc,v)=>acc+Number(v.total||0),0))}</span>
+                    <span>${dinero(c.totalMixto)}</span>
                 </div>
 
                 <div class="ventaDashboard" style="border-top:2px dashed #eee;margin-top:8px;padding-top:14px">
                     <div>
                         <strong>💳 Cobros de deuda</strong>
-                        <small>${cobrosPeriodo.length} pagos de clientes (E: ${dinero(cobrosEfectivo)} · T: ${dinero(cobrosTransferencia)})</small>
+                        <small>${c.cobros.length} pagos de clientes (E: ${dinero(c.cobrosEfectivo)} · T: ${dinero(c.cobrosTransferencia)})</small>
                     </div>
-                    <span>${dinero(totalCobrado)}</span>
+                    <span>${dinero(c.totalCobrado)}</span>
+                </div>
+
+                <div class="ventaDashboard">
+                    <div>
+                        <strong>💸 Gastos</strong>
+                        <small>E: ${dinero(c.gastosEfectivo)} · T: ${dinero(c.gastosTransferencia)}</small>
+                    </div>
+                    <span class="saldoDeuda">− ${dinero(c.totalGastos)}</span>
                 </div>
 
             </div>
@@ -395,11 +417,11 @@ function generarReporte(){
                 <h2>🏆 Top productos</h2>
 
                 ${
-                    topProductos.length
-                    ? topProductos.map(([nombre, cant]) => `
+                    c.topProductos.length
+                    ? c.topProductos.map(([nombre, cant]) => `
                         <div class="ventaDashboard">
                             <div>
-                                <strong>${nombre}</strong>
+                                <strong>${esc(nombre)}</strong>
                                 <small>${formatearStock(cant)} bolsas</small>
                             </div>
                         </div>
@@ -416,7 +438,7 @@ function generarReporte(){
             <h2>👥 Clientes con más compras</h2>
 
             ${
-                topClientes.length
+                c.topClientes.length
                 ? `<div class="tablaProveedores">
                     <table>
                         <thead>
@@ -426,9 +448,9 @@ function generarReporte(){
                             </tr>
                         </thead>
                         <tbody>
-                            ${topClientes.map(([nombre, total]) => `
+                            ${c.topClientes.map(([nombre, total]) => `
                                 <tr>
-                                    <td><strong>${nombre}</strong></td>
+                                    <td><strong>${esc(nombre)}</strong></td>
                                     <td class="saldoOK">${dinero(total)}</td>
                                 </tr>
                             `).join("")}
@@ -441,5 +463,104 @@ function generarReporte(){
         </div>
 
     `;
+
+}
+
+/* ==========================================
+   IMPRIMIR / EXPORTAR LA CAJA
+========================================== */
+
+function textoPeriodoReporte(f){
+
+    const d = f.desde ? fechaTextoDeISO(f.desde) : "el inicio";
+    const h = f.hasta ? fechaTextoDeISO(f.hasta) : "hoy";
+
+    return (f.desde && f.desde === f.hasta ? "Día " + d : "Desde " + d + " hasta " + h)
+        + (f.empleado ? " · " + f.empleado : " · Todos");
+
+}
+
+function filasResumenCaja(c){
+
+    const filas = [
+        ["Ventas cobradas (" + c.ventasCobradas.length + ")", c.totalVentas],
+        ["   en efectivo", c.ventasEfectivo],
+        ["   en transferencia", c.ventasTransferencia],
+        ["Cobros de deuda (" + c.cobros.length + ")", c.totalCobrado],
+        ["   en efectivo", c.cobrosEfectivo],
+        ["   en transferencia", c.cobrosTransferencia],
+        ["Gastos (" + c.gastosPeriodo.length + ")", -c.totalGastos],
+        ["   en efectivo", -c.gastosEfectivo],
+        ["   en transferencia", -c.gastosTransferencia],
+        ["DINERO EN EFECTIVO", c.dineroEfectivo],
+        ["DINERO EN TRANSFERENCIA", c.dineroTransferencia],
+        ["Vendido fiado, sin cobrar (" + c.ventasFiadas.length + ")", c.totalFiado]
+    ];
+
+    c.separar.forEach(([grupo, d]) =>{
+
+        filas.push(["Separar " + grupo + " (" + formatearStock(d.bolsas) + " bolsas)", d.monto]);
+
+    });
+
+    return filas;
+
+}
+
+function imprimirReporte(){
+
+    const f = filtrosReporteActuales();
+
+    const c = calcularCaja(f.desde, f.hasta, f.empleado);
+
+    const n = configuracionSistema.negocio || {};
+
+    const filaGasto = g => `
+        <tr>
+            <td>${esc(g.fechaTexto || fechaTextoDeISO(g.fecha))}</td>
+            <td>${esc(g.descripcion)}</td>
+            <td class="derecha">${dinero(g.monto)}</td>
+        </tr>
+    `;
+
+    imprimirHtml(`
+        <div class="hojaImpresion">
+            <h1>${esc(n.nombre || "")}</h1>
+            <h2>Caja</h2>
+            <p>${esc(textoPeriodoReporte(f))} · Impreso el ${esc(fechaHoraTexto(new Date()))}</p>
+            <table>
+                <tbody>
+                    ${filasResumenCaja(c).map(([texto, monto]) => `
+                        <tr class="${/^[A-ZÁÉÍÓÚ ]+$/.test(texto) ? "filaFuerte" : ""}">
+                            <td>${esc(texto).replace(/^ +/, "&nbsp;&nbsp;&nbsp;&nbsp;")}</td>
+                            <td class="derecha">${dinero(monto)}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+            ${c.gastosPeriodo.length ? `
+                <h3>Detalle de gastos</h3>
+                <table>
+                    <thead><tr><th>Fecha</th><th>Descripción</th><th class="derecha">Monto</th></tr></thead>
+                    <tbody>${c.gastosPeriodo.map(filaGasto).join("")}</tbody>
+                </table>
+            ` : ""}
+        </div>
+    `, "impresionHoja");
+
+}
+
+function exportarReporteCSV(){
+
+    const f = filtrosReporteActuales();
+
+    const c = calcularCaja(f.desde, f.hasta, f.empleado);
+
+    const filas = [["Caja", textoPeriodoReporte(f)], []]
+        .concat(filasResumenCaja(c).map(([texto, monto]) => [texto.trim(), monto]));
+
+    descargarArchivo("Caja_" + (f.desde || "inicio") + "_" + (f.hasta || "hoy") + ".csv", generarCSV(filas), "text/csv;charset=utf-8");
+
+    notificacion("Caja exportada.");
 
 }

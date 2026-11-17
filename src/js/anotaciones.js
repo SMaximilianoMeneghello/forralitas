@@ -139,7 +139,7 @@ function actualizarTablaAnotaciones(){
         tbody.innerHTML = `
             <tr>
                 <td colspan="3" class="tablaVacia">
-                    No se encontraron carpetas para "${filtroAnotaciones}".
+                    No se encontraron carpetas para "${esc(filtroAnotaciones)}".
                 </td>
             </tr>
         `;
@@ -152,25 +152,25 @@ function actualizarTablaAnotaciones(){
 
         tbody.innerHTML += `
             <tr>
-                <td><strong>📁 ${c.titulo}</strong></td>
-                <td>${c.actualizadoTexto || c.fechaTexto || "—"}</td>
+                <td><strong>📁 ${esc(c.titulo)}</strong></td>
+                <td>${esc(c.actualizadoTexto || c.fechaTexto || "—")}</td>
                 <td class="accionesTabla">
                     <button
                         class="btnAccion btnVer"
                         title="Abrir anotaciones"
-                        onclick="verCarpetaNota('${c.id}')">
+                        onclick="verCarpetaNota('${esc(c.id)}')">
                         👁️
                     </button>
                     <button
                         class="btnAccion btnEditar"
                         title="Renombrar carpeta"
-                        onclick="editarCarpetaNota('${c.id}')">
+                        onclick="editarCarpetaNota('${esc(c.id)}')">
                         ✏️
                     </button>
                     <button
                         class="btnAccion btnBorrar"
                         title="Eliminar carpeta"
-                        onclick="eliminarCarpetaNota('${c.id}')">
+                        onclick="eliminarCarpetaNota('${esc(c.id)}')">
                         🗑️
                     </button>
                 </td>
@@ -251,7 +251,7 @@ function guardarCarpetaNota(){
 
         carpetasNotas.unshift({
 
-            id: "N" + Date.now(),
+            id: nuevoId("N"),
 
             titulo,
 
@@ -271,7 +271,7 @@ function guardarCarpetaNota(){
 
     }
 
-    guardarDatos();
+    guardarDatos("carpetasNotas");
 
     cerrarModalCarpetaNota();
 
@@ -305,7 +305,7 @@ function eliminarCarpetaNota(id){
 
             );
 
-            guardarDatos();
+            guardarDatos("carpetasNotas", "eliminaciones");
 
             actualizarTablaAnotaciones();
 
@@ -339,6 +339,8 @@ function renderAnotacionDetalle(id){
 
     document.getElementById("tituloAnotacionDetalle").textContent = "📁 " + carpeta.titulo;
 
+    textoAnotacionAlAbrir = carpeta.contenido || "";
+
     document.getElementById("contenidoAnotacionDetalle").innerHTML = `
 
         <div class="card">
@@ -346,15 +348,15 @@ function renderAnotacionDetalle(id){
             <textarea
                 id="textoAnotacion"
                 class="blocDeNotas"
-                placeholder="Escribí acá todo lo que quieras anotar sobre esta carpeta...">${carpeta.contenido || ""}</textarea>
+                placeholder="Escribí acá todo lo que quieras anotar sobre esta carpeta...">${esc(carpeta.contenido || "")}</textarea>
 
             <div class="accionesModal" style="margin-top:14px;justify-content:space-between">
 
                 <span class="notaGuardadoAnotacion" id="notaGuardadoAnotacion">
-                    ${carpeta.actualizadoTexto ? "Última actualización: " + carpeta.actualizadoTexto : ""}
+                    ${carpeta.actualizadoTexto ? "Última actualización: " + esc(carpeta.actualizadoTexto) : ""}
                 </span>
 
-                <button class="btnGuardar" onclick="guardarTextoAnotacion('${id}')">
+                <button class="btnGuardar" onclick="guardarTextoAnotacion('${esc(id)}')">
                     Guardar
                 </button>
 
@@ -366,20 +368,46 @@ function renderAnotacionDetalle(id){
 
 }
 
+/* Si otra PC cambió esta misma carpeta mientras se escribía, se avisa
+   antes de pisar su texto. */
+let textoAnotacionAlAbrir = "";
+
 function guardarTextoAnotacion(id){
 
     const carpeta = carpetasNotas.find(c => c.id === id);
 
     if(!carpeta) return;
 
-    carpeta.contenido = document.getElementById("textoAnotacion").value;
+    const nuevoTexto = document.getElementById("textoAnotacion").value;
+
+    if((carpeta.contenido || "") !== textoAnotacionAlAbrir && (carpeta.contenido || "") !== nuevoTexto
+        && !guardarTextoAnotacion.forzar){
+
+        confirmar(
+            "Otra persona modificó esta carpeta mientras escribías. Si guardás, se reemplaza su texto por el tuyo. ¿Guardar igual?",
+            ()=>{
+
+                guardarTextoAnotacion.forzar = true;
+
+                try{ guardarTextoAnotacion(id); }finally{ guardarTextoAnotacion.forzar = false; }
+
+            }
+        );
+
+        return;
+
+    }
+
+    carpeta.contenido = nuevoTexto;
+
+    textoAnotacionAlAbrir = nuevoTexto;
 
     const ahora = new Date();
 
     carpeta.actualizadoISO = ahora.toISOString();
     carpeta.actualizadoTexto = fechaHoraTexto(ahora);
 
-    guardarDatos();
+    guardarDatos("carpetasNotas");
 
     const nota = document.getElementById("notaGuardadoAnotacion");
 

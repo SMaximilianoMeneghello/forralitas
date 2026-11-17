@@ -158,7 +158,7 @@ function actualizarTablaMezclas(){
         tbody.innerHTML = `
             <tr>
                 <td colspan="5" class="tablaVacia">
-                    No se encontraron mezclas para "${filtroMezclas}".
+                    No se encontraron mezclas para "${esc(filtroMezclas)}".
                 </td>
             </tr>
         `;
@@ -179,27 +179,27 @@ function actualizarTablaMezclas(){
 
         tbody.innerHTML += `
             <tr>
-                <td><strong>${m.nombre || "—"}</strong> <small>(lote de ${formatearStock(m.bolsasPorLote || 10)} bolsas)</small></td>
-                <td>${(m.productoSalida && m.productoSalida.nombre) || "—"}</td>
-                <td>${resumenIngredientes}</td>
+                <td><strong>${esc(m.nombre || "—")}</strong> <small>(lote de ${formatearStock(m.bolsasPorLote || 10)} bolsas)</small></td>
+                <td>${esc((m.productoSalida && m.productoSalida.nombre) || "—")}</td>
+                <td>${esc(resumenIngredientes)}</td>
                 <td>${(m.producciones || []).length}</td>
                 <td class="accionesTabla">
                     <button
                         class="btnAccion btnVer"
                         title="Ver y producir"
-                        onclick="verDetalleMezcla('${m.id}')">
+                        onclick="verDetalleMezcla('${esc(m.id)}')">
                         👁️
                     </button>
                     <button
                         class="btnAccion btnEditar"
                         title="Editar receta"
-                        onclick="editarMezcla('${m.id}')">
+                        onclick="editarMezcla('${esc(m.id)}')">
                         ✏️
                     </button>
                     <button
                         class="btnAccion btnBorrar"
                         title="Eliminar receta"
-                        onclick="eliminarMezcla('${m.id}')">
+                        onclick="eliminarMezcla('${esc(m.id)}')">
                         🗑️
                     </button>
                 </td>
@@ -237,8 +237,8 @@ function activarBuscadorProductoMezcla(contenedor){
         }else{
 
             lista.innerHTML = coincidencias.map(p => `
-                <div class="sugerenciaProductoMezcla" data-id="${p.id}" data-nombre="${p.nombre}">
-                    ${p.nombre} <small>(stock: ${formatearStock(p.stock)})</small>
+                <div class="sugerenciaProductoMezcla" data-id="${esc(p.id)}" data-nombre="${esc(p.nombre)}">
+                    ${esc(p.nombre)} <small>(stock: ${formatearStock(p.stock)})</small>
                 </div>
             `).join("");
 
@@ -421,6 +421,8 @@ function quitarFilaIngredienteMezcla(idFila){
 
 function guardarMezcla(){
 
+    if(!puede("mezclas")){ avisarSinPermiso(); return; }
+
     const nombre = document.getElementById("nombreMezcla").value.trim();
 
     if(!nombre){
@@ -509,6 +511,22 @@ function guardarMezcla(){
 
     }
 
+    if(ingredientes.some(i => i.idProducto === productoSalida.id)){
+
+        notificacion("El producto de salida no puede ser también un ingrediente de la misma mezcla.", "warning");
+
+        return;
+
+    }
+
+    if(new Set(ingredientes.map(i => i.idProducto)).size !== ingredientes.length){
+
+        notificacion("Hay un ingrediente repetido: dejalo una sola vez con la cantidad total.", "warning");
+
+        return;
+
+    }
+
     if(ingredientes.length === 0){
 
         notificacion("Cargá al menos un ingrediente con cantidad válida.", "warning");
@@ -539,7 +557,7 @@ function guardarMezcla(){
 
         mezclas.unshift({
 
-            id: "M" + Date.now(),
+            id: nuevoId("M"),
             nombre,
             bolsasPorLote,
             productoSalida: { id: productoSalida.id, nombre: productoSalida.nombre },
@@ -553,7 +571,7 @@ function guardarMezcla(){
 
     }
 
-    guardarDatos();
+    guardarDatos("mezclas");
 
     cerrarModalMezcla();
 
@@ -564,6 +582,8 @@ function guardarMezcla(){
 }
 
 function eliminarMezcla(id){
+
+    if(!puede("mezclas")){ avisarSinPermiso(); return; }
 
     const mezcla = mezclas.find(m => m.id === id);
 
@@ -589,7 +609,7 @@ function eliminarMezcla(id){
 
             );
 
-            guardarDatos();
+            guardarDatos("mezclas", "eliminaciones");
 
             actualizarTablaMezclas();
 

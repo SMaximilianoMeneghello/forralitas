@@ -4,152 +4,142 @@
 
 const CONFIG_DEFAULT = {
 
+    negocio:{
+        nombre:"FORRALITAS",
+        direccion:"",
+        telefono:"",
+        cuit:"",
+        pieTicket:"¡Gracias por su compra!"
+    },
+
     tema:{
-
         color:"#2e7d32",
-
         fondo:"#f5f6fa",
-
         fuente:"16",
-
         animaciones:true,
-
         sombras:true,
-
         radio:18
-
     },
 
     dashboard:{
-
         mostrarUltimasVentas:true,
-
         mostrarStock:true,
-
-        mostrarClientes:true,
-
-        mostrarGastos:true,
-
         cantidadVentas:5
-
     },
 
     ventas:{
-
         confirmarEliminar:true,
-
         confirmarVenta:false,
-
         sonidoVenta:true,
-
-        ventaRapida:true
-
+        imprimirAlVender:false,
+        avisoGalpon:true
     },
 
     inventario:{
-
         stockMinimo:5,
+        alertas:true
+    },
 
-        alertas:true,
+    // Lo que pueden hacer los empleados (ver PERMISOS_EMPLEADO en auth.js).
+    permisos:{},
 
-        mostrarSinStock:true
-
-    }
+    // Ajustes de datos ya aplicados (ver migrarDatos en app.js).
+    migraciones:{}
 
 };
 
-let configuracionSistema = JSON.parse(localStorage.getItem("configuracionSistema")) || CONFIG_DEFAULT;
+let configuracionSistema = JSON.parse(JSON.stringify(CONFIG_DEFAULT));
 
-function guardarConfiguracion(){
+try{
 
-    localStorage.setItem("configuracionSistema", JSON.stringify(configuracionSistema));
+    // Se usa la última configuración guardada para pintar la app con
+    // sus colores desde el primer instante.
+    const previa = JSON.parse(localStorage.getItem("configuracionSistema"));
 
-    if(window.FirebaseDB) window.FirebaseDB.guardarColeccion("configuracionSistema", configuracionSistema);
+    if(previa && typeof previa === "object") configuracionSistema = previa;
+
+}catch(e){ /* nada */ }
+
+/* Completa la configuración con los valores por defecto de las
+   opciones que todavía no existían cuando se guardó. */
+function completarConfiguracion(){
+
+    const completar = (destino, defecto) =>{
+
+        Object.keys(defecto).forEach(k =>{
+
+            const esGrupo = defecto[k] !== null && typeof defecto[k] === "object" && !Array.isArray(defecto[k]);
+
+            if(esGrupo){
+
+                if(!destino[k] || typeof destino[k] !== "object") destino[k] = {};
+
+                completar(destino[k], defecto[k]);
+
+            }else if(destino[k] === undefined){
+
+                destino[k] = defecto[k];
+
+            }
+
+        });
+
+    };
+
+    if(!configuracionSistema || typeof configuracionSistema !== "object") configuracionSistema = {};
+
+    completar(configuracionSistema, CONFIG_DEFAULT);
 
 }
 
-/* ==========================================
-   SINCRONIZAR CONFIGURACIÓN CON FIREBASE
-   La app ya se pinta con el valor local/por
-   defecto al instante; esto la actualiza si
-   hay una configuración distinta en la nube.
-========================================== */
-async function sincronizarConfiguracionFirebase(){
+completarConfiguracion();
 
-    if(!window.FirebaseDB) return;
+function guardarConfiguracion(){
 
-    const remoto = await window.FirebaseDB.leerColeccion("configuracionSistema");
-
-    if(remoto === undefined) return; // sin conexión
-
-    if(remoto === null){
-
-        window.FirebaseDB.guardarColeccion("configuracionSistema", configuracionSistema);
-
-    }else{
-
-        configuracionSistema = remoto;
-
-        localStorage.setItem("configuracionSistema", JSON.stringify(configuracionSistema));
-
-        aplicarTema();
-
-    }
-
-    window.FirebaseDB.escucharColeccion("configuracionSistema", (remoto) =>{
-
-        configuracionSistema = remoto;
-
-        localStorage.setItem("configuracionSistema", JSON.stringify(configuracionSistema));
-
-        aplicarTema();
-
-    });
+    guardarDatos("configuracionSistema");
 
 }
 
 function aplicarTema(){
 
-    document.documentElement.style.setProperty("--color-principal", configuracionSistema.tema.color);
+    const tema = configuracionSistema.tema;
 
-    document.documentElement.style.setProperty("--color-primario", configuracionSistema.tema.color);
+    const raiz = document.documentElement.style;
 
-    document.documentElement.style.setProperty("--verde", configuracionSistema.tema.color);
+    raiz.setProperty("--color-principal", tema.color);
+    raiz.setProperty("--color-primario", tema.color);
+    raiz.setProperty("--verde", tema.color);
+    raiz.setProperty("--radio", tema.radio + "px");
 
-    document.documentElement.style.setProperty("--radio", configuracionSistema.tema.radio + "px");
+    if(document.body){
 
-    document.body.style.background = configuracionSistema.tema.fondo;
+        document.body.style.background = tema.fondo;
 
-    document.documentElement.style.fontSize = configuracionSistema.tema.fuente + "px";
+        document.body.classList.toggle("sinSombras", !tema.sombras);
 
-    if(configuracionSistema.tema.sombras){
-
-        document.body.classList.remove("sinSombras");
-
-    }else{
-
-        document.body.classList.add("sinSombras");
+        document.body.classList.toggle("sinAnimaciones", !tema.animaciones);
 
     }
 
-    if(configuracionSistema.tema.animaciones){
-
-        document.body.classList.remove("sinAnimaciones");
-
-    }else{
-
-        document.body.classList.add("sinAnimaciones");
-
-    }
+    document.documentElement.style.fontSize = tema.fuente + "px";
 
 }
 
-aplicarTema();
+/* Nombre del negocio en el menú, el login y el título de la ventana. */
+function aplicarDatosNegocio(){
+
+    const nombre = (configuracionSistema.negocio.nombre || "").trim() || "Mi negocio";
+
+    document.querySelectorAll(".nombreNegocio").forEach(el =>{ el.textContent = nombre; });
+
+    document.title = nombre;
+
+}
 
 /* ==========================================
    TAMAÑO DE TARJETAS
    (preferencia local de esta computadora,
-   no se sincroniza con Firebase a propósito)
+   no se sincroniza a propósito)
 ========================================== */
 
 function escalaTarjetasActual(){
@@ -161,6 +151,8 @@ function escalaTarjetasActual(){
 function aplicarEscalaTarjetas(){
 
     const escala = escalaTarjetasActual();
+
+    if(!document.body) return;
 
     document.body.classList.remove("tarjetasChicas", "tarjetasGrandes");
 
@@ -182,43 +174,54 @@ function guardarEscalaTarjetas(){
 
 }
 
-aplicarEscalaTarjetas();
-
 /* ==========================================
    RENDER CONFIGURACIÓN
 ========================================== */
 
+function marcado(valor){
+
+    return valor ? "checked" : "";
+
+}
+
 function renderConfiguracion(){
 
-    contenido().innerHTML = `
+    const cfg = configuracionSistema;
 
-    <div class="configuracion">
+    const admin = esAdmin();
 
-    <div class="cardConfig">
+    const seccionesAdmin = !admin ? "" : `
 
-    <h2>👤 Mi Cuenta</h2>
+    <div class="cardConfig" style="grid-column:1/-1">
 
-    <p><b>Nombre:</b> ${usuarioActual.nombre}</p>
+    <h2>🏪 Datos del negocio</h2>
 
-    <p><b>Usuario:</b> ${usuarioActual.usuario}</p>
+    <p class="ayudaConfig">Aparecen en el menú, en la pantalla de ingreso y en los comprobantes impresos.</p>
 
-    <p><b>Rol:</b> ${usuarioActual.rol}</p>
+    <div class="filaConfig">
+        <div><label>Nombre del negocio</label><input id="negocioNombre" type="text" value="${esc(cfg.negocio.nombre)}"></div>
+        <div><label>Dirección</label><input id="negocioDireccion" type="text" value="${esc(cfg.negocio.direccion)}"></div>
+        <div><label>Teléfono</label><input id="negocioTelefono" type="text" value="${esc(cfg.negocio.telefono)}"></div>
+        <div><label>CUIT (opcional)</label><input id="negocioCuit" type="text" value="${esc(cfg.negocio.cuit)}"></div>
+    </div>
+
+    <label>Texto al pie del comprobante</label>
+    <input id="negocioPie" type="text" value="${esc(cfg.negocio.pieTicket)}">
+
+    <button class="btnGuardar" id="guardarNegocio">Guardar datos del negocio</button>
 
     </div>
 
-    ${esAdmin() ? `
     <div class="cardConfig" style="grid-column:1/-1">
 
-    <h2>👥 Gestión de usuarios (Administrador)</h2>
+    <h2>👥 Usuarios</h2>
 
-    <p style="margin-bottom:14px;color:#777">
-        Creá cuentas para cada empleado, cambiales el nombre, el rol o la
-        contraseña. Cada uno solo ve sus propias ventas y gastos en Caja.
+    <p class="ayudaConfig">
+        Creá una cuenta para cada persona. Cada uno ve en Caja solo lo que cargó
+        (salvo que le des permiso para ver todo).
     </p>
 
-    <button class="btnAgregar" id="btnNuevoUsuarioAdmin" style="margin-bottom:14px">
-        + Nuevo usuario
-    </button>
+    <button class="btnAgregar" id="btnNuevoUsuarioAdmin" style="margin-bottom:14px">+ Nuevo usuario</button>
 
     <div class="tablaClientes">
         <table>
@@ -235,41 +238,70 @@ function renderConfiguracion(){
     </div>
 
     </div>
-    ` : ""}
 
     <div class="cardConfig">
 
-    <h2>🔐 Contraseña</h2>
+    <h2>🔑 Permisos de los empleados</h2>
 
-    <div class="grupoInput">
+    <p class="ayudaConfig">El administrador siempre puede hacer todo. Marcá lo que pueden hacer los empleados.</p>
 
-    <label>Actual</label>
+    ${PERMISOS_EMPLEADO.map(p => `
+        <label>
+            <input type="checkbox" class="chkPermiso" data-permiso="${p.clave}"
+                ${marcado(cfg.permisos[p.clave] !== undefined ? cfg.permisos[p.clave] : p.defecto)}>
+            ${esc(p.texto)}
+        </label>
+    `).join("")}
 
-    <input id="passwordActual" type="password">
-
-    </div>
-
-    <div class="grupoInput">
-
-    <label>Nueva</label>
-
-    <input id="passwordNueva" type="password">
+    <button class="btnGuardar" id="guardarPermisos">Guardar permisos</button>
 
     </div>
 
-    <div class="grupoInput">
+    <div class="cardConfig">
 
-    <label>Repetir</label>
+    <h2>💰 Ventas</h2>
 
-    <input id="passwordRepetir" type="password">
+    <label><input id="confirmarVenta" type="checkbox" ${marcado(cfg.ventas.confirmarVenta)}> Pedir confirmación antes de registrar una venta</label>
+
+    <label><input id="confirmarEliminar" type="checkbox" ${marcado(cfg.ventas.confirmarEliminar)}> Pedir confirmación al quitar un producto de la venta</label>
+
+    <label><input id="sonidoVenta" type="checkbox" ${marcado(cfg.ventas.sonidoVenta)}> Sonido al registrar la venta</label>
+
+    <label><input id="imprimirAlVender" type="checkbox" ${marcado(cfg.ventas.imprimirAlVender)}> Imprimir el comprobante al registrar la venta</label>
+
+    <label><input id="avisoGalpon" type="checkbox" ${marcado(cfg.ventas.avisoGalpon)}> Avisar cada venta a la pantalla del galpón</label>
+
+    <button class="btnGuardar" id="guardarVentas">Guardar Ventas</button>
 
     </div>
 
-    <button class="btnGuardar" id="btnCambiarPassword">
+    <div class="cardConfig">
 
-    Guardar contraseña
+    <h2>📦 Inventario</h2>
 
-    </button>
+    <label>Stock mínimo para los productos que no tienen uno propio</label>
+
+    <input id="stockMinimo" type="text" inputmode="numeric" autocomplete="off" oninput="limpiarNumero(this)" value="${esc(cfg.inventario.stockMinimo)}">
+
+    <label><input id="alertasStock" type="checkbox" ${marcado(cfg.inventario.alertas)}> Avisar cuando un producto queda con poco stock al venderlo</label>
+
+    <button class="btnGuardar" id="guardarInventario">Guardar Inventario</button>
+
+    </div>
+
+    <div class="cardConfig">
+
+    <h2>📊 Dashboard</h2>
+
+    <label><input id="chkVentas" type="checkbox" ${marcado(cfg.dashboard.mostrarUltimasVentas)}> Mostrar últimas ventas</label>
+
+    <label><input id="chkStock" type="checkbox" ${marcado(cfg.dashboard.mostrarStock)}> Mostrar productos con poco stock</label>
+
+    <label>Cantidad de últimas ventas</label>
+
+    <input id="cantVentas" type="text" inputmode="numeric" autocomplete="off" oninput="limpiarNumero(this)" value="${esc(cfg.dashboard.cantidadVentas)}">
+
+    <button class="btnGuardar" id="guardarDashboard">Guardar Dashboard</button>
 
     </div>
 
@@ -278,42 +310,92 @@ function renderConfiguracion(){
     <h2>🎨 Apariencia</h2>
 
     <label>Color principal</label>
-
-    <input id="colorPrincipal" type="color" value="${configuracionSistema.tema.color}">
+    <input id="colorPrincipal" type="color" value="${esc(cfg.tema.color)}">
 
     <label>Color de fondo</label>
-
-    <input id="colorFondo" type="color" value="${configuracionSistema.tema.fondo}">
+    <input id="colorFondo" type="color" value="${esc(cfg.tema.fondo)}">
 
     <label>Tamaño letra</label>
-
-    <input id="tamFuente" type="range" min="12" max="22" value="${configuracionSistema.tema.fuente}">
+    <input id="tamFuente" type="range" min="12" max="22" value="${esc(cfg.tema.fuente)}">
 
     <label>Radio Bordes</label>
+    <input id="radio" type="range" min="6" max="35" value="${esc(cfg.tema.radio)}">
 
-    <input id="radio" type="range" min="6" max="35" value="${configuracionSistema.tema.radio}">
+    <label><input id="animaciones" type="checkbox" ${marcado(cfg.tema.animaciones)}> Animaciones</label>
 
-    <label>
+    <label><input id="sombras" type="checkbox" ${marcado(cfg.tema.sombras)}> Sombras</label>
 
-    <input id="animaciones" type="checkbox" ${configuracionSistema.tema.animaciones ? "checked" : ""}>
+    <button class="btnGuardar" id="guardarTema">Guardar Apariencia</button>
 
-    Animaciones
+    </div>
 
-    </label>
+    <div class="cardConfig">
 
-    <label>
+    <h2>💾 Copia de seguridad</h2>
 
-    <input id="sombras" type="checkbox" ${configuracionSistema.tema.sombras ? "checked" : ""}>
+    <p class="ayudaConfig">
+        Guardá cada tanto una copia de TODOS los datos en un archivo
+        (por ejemplo en un pendrive). Con "Importar" se puede volver a esa copia.
+    </p>
 
-    Sombras
+    <button class="btnGuardar" id="btnExportarDatos">⬇ Exportar copia de seguridad</button>
 
-    </label>
+    <button class="btnSecundario" id="btnImportarDatos">⬆ Importar copia de seguridad</button>
 
-    <button class="btnGuardar" id="guardarTema">
+    <button class="btnSecundario" id="btnRestablecerConfiguracion">Restablecer apariencia y opciones</button>
 
-    Guardar Apariencia
+    </div>
 
-    </button>
+    <div class="cardConfig">
+
+    <h2>☁ Sincronización</h2>
+
+    <p id="detalleSync" class="ayudaConfig"></p>
+
+    <button class="btnGuardar" id="btnSincronizarAhora">Sincronizar ahora</button>
+
+    </div>
+
+    ${htmlCuentaNegocio()}
+
+    `;
+
+    contenido().innerHTML = `
+
+    <div class="configuracion">
+
+    <div class="cardConfig">
+
+    <h2>👤 Mi Cuenta</h2>
+
+    <p><b>Nombre:</b> ${esc(usuarioActual.nombre)}</p>
+
+    <p><b>Usuario:</b> ${esc(usuarioActual.usuario)}</p>
+
+    <p><b>Rol:</b> ${admin ? "Administrador" : "Empleado"}</p>
+
+    </div>
+
+    <div class="cardConfig">
+
+    <h2>🔐 Contraseña</h2>
+
+    <div class="grupoInput">
+    <label>Actual</label>
+    <input id="passwordActual" type="password" autocomplete="current-password">
+    </div>
+
+    <div class="grupoInput">
+    <label>Nueva</label>
+    <input id="passwordNueva" type="password" autocomplete="new-password">
+    </div>
+
+    <div class="grupoInput">
+    <label>Repetir</label>
+    <input id="passwordRepetir" type="password" autocomplete="new-password">
+    </div>
+
+    <button class="btnGuardar" id="btnCambiarPassword">Guardar contraseña</button>
 
     </div>
 
@@ -321,7 +403,7 @@ function renderConfiguracion(){
 
     <h2>🗂️ Tamaño de tarjetas</h2>
 
-    <p style="font-size:13px;color:#888;margin-top:-6px;margin-bottom:10px">
+    <p class="ayudaConfig">
         Es una preferencia de esta computadora: cada PC puede elegir
         la suya sin afectar a las demás.
     </p>
@@ -334,173 +416,96 @@ function renderConfiguracion(){
         <option value="grandes" ${escalaTarjetasActual() === "grandes" ? "selected" : ""}>Grandes (más fáciles de leer)</option>
     </select>
 
-    <button class="btnGuardar" id="guardarEscalaTarjetas">
-
-    Guardar Tamaño
-
-    </button>
+    <button class="btnGuardar" id="guardarEscalaTarjetas">Guardar Tamaño</button>
 
     </div>
 
-    <div class="cardConfig">
-
-    <h2>📊 Dashboard</h2>
-
-    <label>
-
-    <input id="chkVentas" type="checkbox" ${configuracionSistema.dashboard.mostrarUltimasVentas ? "checked" : ""}>
-
-    Mostrar últimas ventas
-
-    </label>
-
-    <label>
-
-    <input id="chkStock" type="checkbox" ${configuracionSistema.dashboard.mostrarStock ? "checked" : ""}>
-
-    Mostrar poco stock
-
-    </label>
-
-    <label>
-
-    Cantidad de ventas
-
-    </label>
-
-    <input id="cantVentas" type="text" inputmode="numeric" autocomplete="off" oninput="limpiarNumero(this)" value="${configuracionSistema.dashboard.cantidadVentas}">
-
-    <button class="btnGuardar" id="guardarDashboard">
-
-    Guardar Dashboard
-
-    </button>
-
-    </div>
-
-    <div class="cardConfig">
-
-    <h2>📦 Inventario</h2>
-
-    <label>Stock mínimo</label>
-
-    <input id="stockMinimo" type="text" inputmode="numeric" autocomplete="off" oninput="limpiarNumero(this)" value="${configuracionSistema.inventario.stockMinimo}">
-
-    <label>
-
-    <input id="alertasStock" type="checkbox" ${configuracionSistema.inventario.alertas ? "checked" : ""}>
-
-    Alertas
-
-    </label>
-
-    <button class="btnGuardar" id="guardarInventario">
-
-    Guardar Inventario
-
-    </button>
-
-    </div>
-
-    <div class="cardConfig">
-
-    <h2>💰 Ventas</h2>
-
-    <label>
-
-    <input id="confirmarEliminar" type="checkbox" ${configuracionSistema.ventas.confirmarEliminar ? "checked" : ""}>
-
-    Confirmar eliminar
-
-    </label>
-
-    <label>
-
-    <input id="ventaRapida" type="checkbox" ${configuracionSistema.ventas.ventaRapida ? "checked" : ""}>
-
-    Venta rápida
-
-    </label>
-
-    <label>
-
-    <input id="sonidoVenta" type="checkbox" ${configuracionSistema.ventas.sonidoVenta ? "checked" : ""}>
-
-    Sonido venta
-
-    </label>
-
-    <button class="btnGuardar" id="guardarVentas">
-
-    Guardar Ventas
-
-    </button>
-
-    </div>
-
-    <div class="cardConfig">
-
-    <h2>💾 Sistema</h2>
-
-    <button class="btnGuardar" id="btnExportarDatos">
-
-    Exportar Datos
-
-    </button>
-
-    <button class="btnGuardar" id="btnImportarDatos">
-
-    Importar Datos
-
-    </button>
-
-    <button class="btnGuardar" id="btnOptimizarSistema">
-
-    Optimizar Sistema
-
-    </button>
-
-    <button class="btnGuardar" id="btnRestablecerConfiguracion">
-
-    Restablecer Configuración
-
-    </button>
-
-    </div>
+    ${seccionesAdmin}
 
     </div>
 
     `;
 
-    document.getElementById("btnCambiarPassword").onclick = cambiarPassword;
+    const enlazar = (id, fn) =>{
 
-    document.getElementById("guardarTema").onclick = guardarTema;
+        const el = document.getElementById(id);
 
-    document.getElementById("guardarEscalaTarjetas").onclick = guardarEscalaTarjetas;
+        if(el) el.onclick = fn;
 
-    document.getElementById("guardarDashboard").onclick = guardarDashboardConfig;
+    };
 
-    document.getElementById("guardarInventario").onclick = guardarInventario;
+    enlazar("btnCambiarPassword", cambiarPassword);
+    enlazar("guardarEscalaTarjetas", guardarEscalaTarjetas);
 
-    document.getElementById("guardarVentas").onclick = guardarVentasConfig;
+    if(!admin) return;
 
-    document.getElementById("btnExportarDatos").onclick = exportarDatos;
+    enlazar("guardarNegocio", guardarNegocio);
+    enlazar("btnNuevoUsuarioAdmin", abrirModalNuevoUsuarioAdmin);
+    enlazar("guardarPermisos", guardarPermisos);
+    enlazar("guardarVentas", guardarVentasConfig);
+    enlazar("guardarInventario", guardarInventario);
+    enlazar("guardarDashboard", guardarDashboardConfig);
+    enlazar("guardarTema", guardarTema);
+    enlazar("btnExportarDatos", exportarDatos);
+    enlazar("btnImportarDatos", importarDatos);
+    enlazar("btnRestablecerConfiguracion", restablecerConfiguracion);
+    enlazar("btnSincronizarAhora", sincronizarAhoraManual);
+    enlazar("btnMigrarACuenta", migrarACuenta);
+    enlazar("btnDesvincularPC", desvincularPC);
 
-    document.getElementById("btnImportarDatos").onclick = importarDatos;
+    actualizarTablaUsuariosAdmin();
 
-    document.getElementById("btnOptimizarSistema").onclick = optimizarSistema;
+    actualizarDetalleSync();
 
-    document.getElementById("btnRestablecerConfiguracion").onclick = restablecerConfiguracion;
+}
 
-    if(esAdmin()){
+/* ==========================================
+   DATOS DEL NEGOCIO / PERMISOS
+========================================== */
 
-        actualizarTablaUsuariosAdmin();
+function guardarNegocio(){
 
-        document.getElementById("btnNuevoUsuarioAdmin").onclick = abrirModalNuevoUsuarioAdmin;
+    if(!soloAdmin()) return;
 
-        document.getElementById("guardarUsuarioAdmin").onclick = guardarUsuarioAdmin;
+    const nombre = document.getElementById("negocioNombre").value.trim();
+
+    if(!nombre){
+
+        notificacion("El nombre del negocio no puede quedar vacío.", "warning");
+
+        return;
 
     }
+
+    const n = configuracionSistema.negocio;
+
+    n.nombre = nombre;
+    n.direccion = document.getElementById("negocioDireccion").value.trim();
+    n.telefono = document.getElementById("negocioTelefono").value.trim();
+    n.cuit = document.getElementById("negocioCuit").value.trim();
+    n.pieTicket = document.getElementById("negocioPie").value.trim();
+
+    guardarConfiguracion();
+
+    aplicarDatosNegocio();
+
+    notificacion("Datos del negocio guardados.");
+
+}
+
+function guardarPermisos(){
+
+    if(!soloAdmin()) return;
+
+    document.querySelectorAll(".chkPermiso").forEach(chk =>{
+
+        configuracionSistema.permisos[chk.dataset.permiso] = chk.checked;
+
+    });
+
+    guardarConfiguracion();
+
+    notificacion("Permisos guardados.");
 
 }
 
@@ -520,20 +525,23 @@ function actualizarTablaUsuariosAdmin(){
         .sort((a,b) => (a.nombre || "").localeCompare(b.nombre || ""))
         .map(u => `
             <tr>
-                <td>${u.nombre}</td>
-                <td>${u.usuario}</td>
-                <td>${u.rol === "admin" ? "Administrador" : "Empleado"}</td>
+                <td>${esc(u.nombre)}</td>
+                <td>${esc(u.usuario)}</td>
+                <td>
+                    ${u.rol === "admin" ? "Administrador" : "Empleado"}
+                    ${u.ocultarEliminaciones ? ` <small title="Sus eliminaciones no se anotan en el panel">(sin registro de eliminaciones)</small>` : ""}
+                </td>
                 <td class="accionesTabla">
                     <button
                         class="btnAccion btnEditar"
                         title="Editar"
-                        onclick="editarUsuarioAdmin('${u.usuario}')">
+                        onclick="editarUsuarioAdmin('${esc(u.usuario)}')">
                         ✏️
                     </button>
                     <button
                         class="btnAccion btnBorrar"
                         title="Eliminar"
-                        onclick="eliminarUsuarioAdmin('${u.usuario}')">
+                        onclick="eliminarUsuarioAdmin('${esc(u.usuario)}')">
                         🗑️
                     </button>
                 </td>
@@ -543,6 +551,8 @@ function actualizarTablaUsuariosAdmin(){
 }
 
 function abrirModalNuevoUsuarioAdmin(){
+
+    if(!soloAdmin()) return;
 
     usuarioAdminEditandoUsuario = null;
 
@@ -554,13 +564,19 @@ function abrirModalNuevoUsuarioAdmin(){
 
     document.getElementById("rolUsuarioNuevo").value = "empleado";
 
+    document.getElementById("ocultarEliminacionesUsuario").checked = false;
+
     document.getElementById("grupoPasswordUsuarioNuevo").querySelector("label").textContent = "Contraseña";
 
     abrir("modalUsuario");
 
+    setTimeout(()=> document.getElementById("nombreUsuarioNuevo").focus(), 100);
+
 }
 
 function editarUsuarioAdmin(loginUsuario){
+
+    if(!soloAdmin()) return;
 
     const u = usuarios.find(x => x.usuario === loginUsuario);
 
@@ -585,23 +601,37 @@ function editarUsuarioAdmin(loginUsuario){
 
     document.getElementById("rolUsuarioNuevo").value = u.rol || "empleado";
 
+    document.getElementById("ocultarEliminacionesUsuario").checked = !!u.ocultarEliminaciones;
+
     abrir("modalUsuario");
 
 }
 
 function guardarUsuarioAdmin(){
 
+    if(!soloAdmin()) return;
+
     const nombre = document.getElementById("nombreUsuarioNuevo").value.trim();
 
-    const loginUsuario = document.getElementById("loginUsuarioNuevo").value.trim();
+    const loginUsuario = normalizarLogin(document.getElementById("loginUsuarioNuevo").value);
 
     const password = document.getElementById("passwordUsuarioNuevo").value;
 
     const rol = document.getElementById("rolUsuarioNuevo").value;
 
+    const ocultarEliminaciones = document.getElementById("ocultarEliminacionesUsuario").checked;
+
     if(!nombre || !loginUsuario){
 
         notificacion("Completá el nombre y el usuario.", "warning");
+
+        return;
+
+    }
+
+    if(password && password.length < 6){
+
+        notificacion("La contraseña debe tener al menos 6 caracteres.", "warning");
 
         return;
 
@@ -613,17 +643,41 @@ function guardarUsuarioAdmin(){
 
         if(!u) return;
 
+        const otrosAdmins = usuarios.filter(x => x.rol === "admin" && x !== u).length;
+
+        if(u.rol === "admin" && rol !== "admin" && otrosAdmins === 0){
+
+            notificacion("Tiene que quedar al menos un administrador.", "warning");
+
+            return;
+
+        }
+
+        const nombreAnterior = u.nombre;
+
         u.nombre = nombre;
-
         u.rol = rol;
+        u.ocultarEliminaciones = ocultarEliminaciones;
 
-        if(password) u.password = password;
+        if(password) asignarPassword(u, password);
+
+        // La Caja separa por nombre del vendedor: si cambia el nombre,
+        // lo que ya cargó sigue quedando a su nombre.
+        if(nombreAnterior !== nombre) renombrarVendedor(u.usuario, nombre);
 
         notificacion("Usuario actualizado.");
 
     }else{
 
-        if(usuarios.some(x => x.usuario === loginUsuario)){
+        if(!/^[a-z0-9._-]+$/.test(loginUsuario)){
+
+            notificacion("El usuario solo puede tener letras, números, puntos y guiones (sin espacios).", "warning");
+
+            return;
+
+        }
+
+        if(buscarUsuario(loginUsuario)){
 
             notificacion("Ya existe un usuario con ese nombre de acceso.", "warning");
 
@@ -639,23 +693,49 @@ function guardarUsuarioAdmin(){
 
         }
 
-        usuarios.push({ usuario: loginUsuario, password, nombre, rol });
+        const cuenta = { usuario: loginUsuario, nombre, rol, ocultarEliminaciones };
+
+        asignarPassword(cuenta, password);
+
+        usuarios.push(cuenta);
 
         notificacion("Usuario creado.");
 
     }
 
-    guardarUsuarios();
+    guardarDatos("usuarios", "historialVentas", "gastos", "clientes");
 
     cerrar("modalUsuario");
 
     actualizarTablaUsuariosAdmin();
 
+    mostrarUsuarioActual();
+
+    aplicarPermisos();
+
     usuarioAdminEditandoUsuario = null;
 
 }
 
+function renombrarVendedor(login, nombreNuevo){
+
+    const cambiar = (reg) =>{
+
+        if(reg.vendedor && reg.vendedor.usuario === login) reg.vendedor.nombre = nombreNuevo;
+
+    };
+
+    historialVentas.forEach(cambiar);
+
+    gastos.forEach(cambiar);
+
+    clientes.forEach(c => (c.pagos || []).forEach(cambiar));
+
+}
+
 function eliminarUsuarioAdmin(loginUsuario){
+
+    if(!soloAdmin()) return;
 
     if(loginUsuario === usuarioActual.usuario){
 
@@ -678,9 +758,7 @@ function eliminarUsuarioAdmin(loginUsuario){
     }
 
     confirmar(
-
         "¿Eliminar el usuario \"" + u.nombre + "\"? Sus ventas y gastos ya cargados quedan igual, solo se elimina el acceso.",
-
         ()=>{
 
             usuarios = usuarios.filter(x => x.usuario !== loginUsuario);
@@ -692,7 +770,6 @@ function eliminarUsuarioAdmin(loginUsuario){
             notificacion("Usuario eliminado.", "error");
 
         }
-
     );
 
 }
@@ -709,7 +786,9 @@ function cambiarPassword(){
 
     const repetir = document.getElementById("passwordRepetir").value;
 
-    if(actual !== usuarioActual.password){
+    const cuenta = buscarUsuario(usuarioActual.usuario);
+
+    if(!cuenta || !passwordCorrecta(cuenta, actual)){
 
         notificacion("La contraseña actual es incorrecta.", "error");
 
@@ -717,9 +796,9 @@ function cambiarPassword(){
 
     }
 
-    if(nueva.length < 4){
+    if(nueva.length < 6){
 
-        notificacion("La nueva contraseña debe tener al menos 4 caracteres.", "warning");
+        notificacion("La nueva contraseña debe tener al menos 6 caracteres.", "warning");
 
         return;
 
@@ -733,15 +812,13 @@ function cambiarPassword(){
 
     }
 
-    usuarioActual.password = nueva;
+    asignarPassword(cuenta, nueva);
+
+    usuarioActual = cuenta;
 
     guardarUsuarios();
 
-    document.getElementById("passwordActual").value = "";
-
-    document.getElementById("passwordNueva").value = "";
-
-    document.getElementById("passwordRepetir").value = "";
+    limpiar("passwordActual", "passwordNueva", "passwordRepetir");
 
     notificacion("Contraseña actualizada correctamente.");
 
@@ -753,23 +830,16 @@ function cambiarPassword(){
 
 function guardarTema(){
 
-    configuracionSistema.tema.color =
-        document.getElementById("colorPrincipal").value;
+    if(!soloAdmin()) return;
 
-    configuracionSistema.tema.fondo =
-        document.getElementById("colorFondo").value;
+    const tema = configuracionSistema.tema;
 
-    configuracionSistema.tema.fuente =
-        document.getElementById("tamFuente").value;
-
-    configuracionSistema.tema.radio =
-        document.getElementById("radio").value;
-
-    configuracionSistema.tema.animaciones =
-        document.getElementById("animaciones").checked;
-
-    configuracionSistema.tema.sombras =
-        document.getElementById("sombras").checked;
+    tema.color = document.getElementById("colorPrincipal").value;
+    tema.fondo = document.getElementById("colorFondo").value;
+    tema.fuente = document.getElementById("tamFuente").value;
+    tema.radio = document.getElementById("radio").value;
+    tema.animaciones = document.getElementById("animaciones").checked;
+    tema.sombras = document.getElementById("sombras").checked;
 
     guardarConfiguracion();
 
@@ -781,14 +851,13 @@ function guardarTema(){
 
 function guardarDashboardConfig(){
 
-    configuracionSistema.dashboard.mostrarUltimasVentas =
-        document.getElementById("chkVentas").checked;
+    if(!soloAdmin()) return;
 
-    configuracionSistema.dashboard.mostrarStock =
-        document.getElementById("chkStock").checked;
+    const d = configuracionSistema.dashboard;
 
-    configuracionSistema.dashboard.cantidadVentas =
-        parseInt(document.getElementById("cantVentas").value) || 5;
+    d.mostrarUltimasVentas = document.getElementById("chkVentas").checked;
+    d.mostrarStock = document.getElementById("chkStock").checked;
+    d.cantidadVentas = Math.min(50, Math.max(1, parseInt(document.getElementById("cantVentas").value) || 5));
 
     guardarConfiguracion();
 
@@ -798,11 +867,13 @@ function guardarDashboardConfig(){
 
 function guardarInventario(){
 
-    configuracionSistema.inventario.stockMinimo =
-        parseInt(document.getElementById("stockMinimo").value) || 5;
+    if(!soloAdmin()) return;
 
-    configuracionSistema.inventario.alertas =
-        document.getElementById("alertasStock").checked;
+    const valor = parseInt(document.getElementById("stockMinimo").value);
+
+    configuracionSistema.inventario.stockMinimo = isNaN(valor) ? 5 : valor;
+
+    configuracionSistema.inventario.alertas = document.getElementById("alertasStock").checked;
 
     guardarConfiguracion();
 
@@ -812,14 +883,15 @@ function guardarInventario(){
 
 function guardarVentasConfig(){
 
-    configuracionSistema.ventas.confirmarEliminar =
-        document.getElementById("confirmarEliminar").checked;
+    if(!soloAdmin()) return;
 
-    configuracionSistema.ventas.ventaRapida =
-        document.getElementById("ventaRapida").checked;
+    const v = configuracionSistema.ventas;
 
-    configuracionSistema.ventas.sonidoVenta =
-        document.getElementById("sonidoVenta").checked;
+    v.confirmarVenta = document.getElementById("confirmarVenta").checked;
+    v.confirmarEliminar = document.getElementById("confirmarEliminar").checked;
+    v.sonidoVenta = document.getElementById("sonidoVenta").checked;
+    v.imprimirAlVender = document.getElementById("imprimirAlVender").checked;
+    v.avisoGalpon = document.getElementById("avisoGalpon").checked;
 
     guardarConfiguracion();
 
@@ -828,50 +900,41 @@ function guardarVentasConfig(){
 }
 
 /* ==========================================
-   EXPORTAR / IMPORTAR
+   COPIA DE SEGURIDAD (EXPORTAR / IMPORTAR)
 ========================================== */
+
+const TABLAS_RESPALDO = [
+    "productos", "clientes", "proveedores", "gastos", "historialVentas",
+    "eliminaciones", "mezclas", "carpetasNotas", "usuarios", "preciosClientes",
+    "configuracionSistema"
+];
 
 function exportarDatos(){
 
+    if(!soloAdmin()) return;
+
     const datos = {
-
-        productos,
-
-        historialVentas,
-
-        clientes,
-
-        gastos,
-
-        proveedores,
-
-        usuarios,
-
-        configuracionSistema
-
+        formato: "respaldo-gestion",
+        version: 2,
+        fecha: new Date().toISOString(),
+        negocio: configuracionSistema.negocio.nombre
     };
 
-    const blob = new Blob(
+    ENTIDADES_SINCRONIZADAS.forEach(ent =>{ datos[ent.nombre] = ent.obtener(); });
 
-        [JSON.stringify(datos, null, 2)],
+    const nombre = "Respaldo_"
+        + (configuracionSistema.negocio.nombre || "negocio").replace(/[^a-zA-Z0-9]+/g, "_")
+        + "_" + fechaLocalISO(new Date()) + ".json";
 
-        { type: "application/json" }
+    descargarArchivo(nombre, JSON.stringify(datos), "application/json");
 
-    );
-
-    const a = document.createElement("a");
-
-    a.href = URL.createObjectURL(blob);
-
-    a.download = "Backup_Forralitas.json";
-
-    a.click();
-
-    notificacion("Backup exportado correctamente.", "success");
+    notificacion("Copia de seguridad exportada.", "success");
 
 }
 
 function importarDatos(){
+
+    if(!soloAdmin()) return;
 
     const input = document.createElement("input");
 
@@ -889,40 +952,88 @@ function importarDatos(){
 
         lector.onload = function(){
 
+            let datos;
+
             try{
 
-                const datos = JSON.parse(lector.result);
+                datos = JSON.parse(lector.result);
 
-                if(datos.productos) productos = datos.productos;
+            }catch(err){
 
-                if(datos.historialVentas) historialVentas = datos.historialVentas;
+                notificacion("El archivo no es una copia de seguridad válida.", "error");
 
-                if(datos.clientes) clientes = datos.clientes;
-
-                if(datos.gastos) gastos = datos.gastos;
-
-                if(datos.proveedores) proveedores = datos.proveedores;
-
-                if(datos.usuarios) usuarios = datos.usuarios;
-
-                if(datos.configuracionSistema)
-                    configuracionSistema = datos.configuracionSistema;
-
-                guardarDatos();
-
-                guardarUsuarios();
-
-                guardarConfiguracion();
-
-                aplicarTema();
-
-                notificacion("Datos importados correctamente.", "success");
-
-            }catch{
-
-                notificacion("Archivo inválido.", "error");
+                return;
 
             }
+
+            const presentes = TABLAS_RESPALDO.filter(t =>
+                t === "configuracionSistema"
+                    ? (datos[t] && typeof datos[t] === "object")
+                    : Array.isArray(datos[t])
+            );
+
+            if(presentes.length === 0){
+
+                notificacion("El archivo no es una copia de seguridad válida.", "error");
+
+                return;
+
+            }
+
+            if(Array.isArray(datos.usuarios) && !datos.usuarios.some(u => u.rol === "admin")){
+
+                notificacion("Esa copia no tiene ningún usuario administrador: no se puede importar.", "error");
+
+                return;
+
+            }
+
+            confirmar(
+                "Se van a REEMPLAZAR los datos actuales por los de la copia"
+                + (datos.fecha ? " del " + fechaHoraTexto(datos.fecha) : "")
+                + " (" + presentes.length + " tablas). Lo cargado después de esa copia se pierde. ¿Continuar?",
+                ()=>{
+
+                    ENTIDADES_SINCRONIZADAS.forEach(ent =>{
+
+                        if(!presentes.includes(ent.nombre)) return;
+
+                        let valor = JSON.parse(JSON.stringify(datos[ent.nombre]));
+
+                        if(ent.clave){
+
+                            valor = SyncNucleo.normalizarClaves(valor, ent.clave, ent.prefijoId).lista;
+
+                        }
+
+                        ent.asignar(valor);
+
+                    });
+
+                    completarConfiguracion();
+
+                    guardarDatos();
+
+                    aplicarTema();
+
+                    aplicarDatosNegocio();
+
+                    revincularReferencias();
+
+                    if(usuarioActual){
+
+                        aplicarPermisos();
+
+                        mostrarUsuarioActual();
+
+                        renderConfiguracion();
+
+                    }
+
+                    notificacion("Copia de seguridad importada correctamente.", "success");
+
+                }
+            );
 
         };
 
@@ -934,15 +1045,17 @@ function importarDatos(){
 
 }
 
-/* ==========================================
-   RESTABLECER
-========================================== */
-
 function restablecerConfiguracion(){
 
-    confirmar("¿Restablecer toda la configuración?", ()=>{
+    if(!soloAdmin()) return;
 
-        configuracionSistema = JSON.parse(JSON.stringify(CONFIG_DEFAULT));
+    confirmar("¿Restablecer la apariencia y las opciones de ventas, inventario y dashboard? (No toca los datos del negocio, los permisos ni la información cargada).", ()=>{
+
+        ["tema", "dashboard", "ventas", "inventario"].forEach(grupo =>{
+
+            configuracionSistema[grupo] = JSON.parse(JSON.stringify(CONFIG_DEFAULT[grupo]));
+
+        });
 
         guardarConfiguracion();
 
@@ -950,44 +1063,227 @@ function restablecerConfiguracion(){
 
         renderConfiguracion();
 
-        notificacion("Configuración restablecida.", "success");
+        notificacion("Opciones restablecidas.", "success");
 
     });
 
 }
 
 /* ==========================================
-   OPTIMIZAR
+   SINCRONIZACIÓN
 ========================================== */
 
-function optimizarSistema(){
+function actualizarDetalleSync(){
 
-    let total = 0;
+    const el = document.getElementById("detalleSync");
 
-    total += productos.length;
+    if(!el || !gestorSync) return;
 
-    total += historialVentas.length;
+    const e = gestorSync.estado();
 
-    total += clientes.length;
+    if(!e.nube){
 
-    total += gastos.length;
+        el.textContent = "Esta instalación guarda los datos solo en esta computadora.";
 
-    total += proveedores.length;
+    }else if(e.sinPermiso){
 
-    total += usuarios.length;
+        el.textContent = "La base de datos rechazó la conexión. Revisá la cuenta del negocio.";
 
-    guardarDatos();
+    }else if(e.pendientes > 0){
 
-    guardarUsuarios();
+        el.textContent = "Hay " + e.pendientes + " cambio(s) guardados en esta PC esperando para subir. "
+            + "Se suben solos apenas haya conexión.";
 
-    guardarConfiguracion();
+    }else if(e.confirmadas < e.total){
+
+        el.textContent = "Sin conexión con la nube: se está trabajando con los datos de esta PC.";
+
+    }else{
+
+        el.textContent = "Todo sincronizado con la nube.";
+
+    }
+
+}
+
+async function sincronizarAhoraManual(){
+
+    if(!gestorSync) return;
+
+    await gestorSync.sincronizarAhora();
+
+    actualizarDetalleSync();
+
+    const e = gestorSync.estado();
 
     notificacion(
+        e.pendientes > 0 ? "Todavía quedan cambios por subir (sin conexión)." : "Sincronización completa.",
+        e.pendientes > 0 ? "warning" : "success"
+    );
 
-        "Optimización finalizada. Registros analizados: " + total,
+}
 
-        "success"
+/* ==========================================
+   CUENTA DEL NEGOCIO
+   Con una cuenta (email y clave), los datos
+   del negocio quedan protegidos: solo las PCs
+   que ingresaron con esa cuenta pueden leerlos.
+========================================== */
 
+function htmlCuentaNegocio(){
+
+    if(!hayNube() || !conexionActual) return "";
+
+    if(conexionActual.modo === "cuenta"){
+
+        return `
+            <div class="cardConfig">
+            <h2>🔒 Cuenta del negocio</h2>
+            <p class="ayudaConfig">
+                Esta PC está vinculada a la cuenta <b>${esc(conexionActual.email || "")}</b>.
+                Los datos solo se pueden ver desde las computadoras que ingresaron con esa cuenta.
+            </p>
+            <button class="btnSecundario" id="btnDesvincularPC">Desvincular esta PC</button>
+            </div>
+        `;
+
+    }
+
+    return `
+        <div class="cardConfig">
+        <h2>🔒 Proteger los datos con una cuenta</h2>
+        <p class="ayudaConfig">
+            Hoy esta instalación funciona sin cuenta. Si ya te crearon una cuenta para el negocio
+            (email y clave), ingresala acá: se copian todos los datos a la cuenta y, desde ese
+            momento, cada PC del negocio va a tener que ingresar con ella una sola vez.
+        </p>
+        <label>Email de la cuenta</label>
+        <input id="migrarEmail" type="text" autocomplete="off">
+        <label>Clave de la cuenta</label>
+        <input id="migrarClave" type="password" autocomplete="off">
+        <button class="btnGuardar" id="btnMigrarACuenta">Pasar a cuenta</button>
+        </div>
+    `;
+
+}
+
+async function migrarACuenta(){
+
+    if(!soloAdmin()) return;
+
+    const email = document.getElementById("migrarEmail").value.trim();
+    const clave = document.getElementById("migrarClave").value;
+    const boton = document.getElementById("btnMigrarACuenta");
+
+    if(!email || !clave){
+
+        notificacion("Completá el email y la clave de la cuenta.", "warning");
+
+        return;
+
+    }
+
+    boton.disabled = true;
+
+    try{
+
+        const cuenta = await window.FirebaseDB.cuenta.ingresar(email, clave);
+
+        const destino = window.FirebaseDB.adaptadorCuenta(cuenta.uid);
+
+        const yaTiene = await destino.leer("usuarios");
+
+        if(yaTiene && Array.isArray(yaTiene.datos) && yaTiene.datos.length > 0){
+
+            await window.FirebaseDB.cuenta.salir();
+
+            notificacion("Esa cuenta ya tiene datos de un negocio cargados. Usá una cuenta nueva.", "error");
+
+            boton.disabled = false;
+
+            return;
+
+        }
+
+        // Se sube primero todo lo pendiente del modo clásico.
+        await gestorSync.sincronizarAhora();
+
+        gestorSync.detener();
+
+        // Copia local para la cuenta: al reiniciar, como la cuenta está
+        // vacía, se sube todo completo.
+        const prefijo = "n:" + cuenta.uid + ":";
+
+        for(const ent of ENTIDADES_SINCRONIZADAS){
+
+            await AlmacenLocal.guardarJson(ent.nombre, JSON.stringify(ent.obtener()), prefijo);
+
+        }
+
+        // Marca para que las demás PCs dejen de usar el modo sin cuenta y
+        // pidan ingresar con la cuenta. Si no se puede dejar, no se sigue.
+        await window.FirebaseDB.adaptadorClasico().escribir("_migrado", {
+            datos: { fecha: new Date().toISOString() },
+            actualizado: Date.now()
+        });
+
+        guardarConexion({ modo: "cuenta", uid: cuenta.uid, email: cuenta.email });
+
+        location.reload();
+
+    }catch(e){
+
+        boton.disabled = false;
+
+        console.error("[Cuenta] No se pudo pasar a cuenta:", e);
+
+        // No se cambió nada: se vuelve a trabajar como antes.
+        if(!leerConexion() || leerConexion().modo !== "cuenta"){
+
+            try{ await window.FirebaseDB.cuenta.salir(); }catch(e2){ /* nada */ }
+
+        }
+
+        notificacion(
+            e && e.code && String(e.code).indexOf("auth/") === 0
+                ? textoErrorCuenta(e)
+                : "No se pudo completar el pase a cuenta (" + ((e && (e.code || e.message)) || "error") + "). No se cambió nada: recargá el programa y probá de nuevo.",
+            "error"
+        );
+
+    }
+
+}
+
+function desvincularPC(){
+
+    if(!soloAdmin()) return;
+
+    const pendientes = gestorSync ? gestorSync.estado().pendientes : 0;
+
+    if(pendientes > 0){
+
+        notificacion("Hay cambios sin subir. Esperá a que se sincronicen antes de desvincular esta PC.", "warning");
+
+        return;
+
+    }
+
+    confirmar(
+        "¿Desvincular esta PC de la cuenta del negocio? Para volver a usar el programa acá va a haber que ingresar otra vez el email y la clave del negocio.",
+        async ()=>{
+
+            if(gestorSync) gestorSync.detener();
+
+            try{ await window.FirebaseDB.cuenta.salir(); }catch(e){ /* nada */ }
+
+            guardarConexion(null);
+
+            localStorage.removeItem("sesionActual");
+
+            location.reload();
+
+        }
     );
 
 }
@@ -996,8 +1292,16 @@ function optimizarSistema(){
    INICIALIZAR TEMA
 ========================================== */
 
+aplicarTema();
+
+aplicarEscalaTarjetas();
+
 window.addEventListener("load", ()=>{
 
     aplicarTema();
+
+    aplicarEscalaTarjetas();
+
+    aplicarDatosNegocio();
 
 });

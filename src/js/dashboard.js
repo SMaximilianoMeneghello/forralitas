@@ -1,16 +1,16 @@
 /* ==========================================
-   DASHBOARD V3
+   DASHBOARD
 ========================================== */
 
 function renderDashboard(){
 
-    const totalProductos = productos.length;
-
-    const valorInventario = productos.reduce((acc,p)=>acc+(Number(p.precioBolsa||0)*Number(p.stock||0)),0);
+    const cfg = configuracionSistema.dashboard;
 
     const hoy = fechaLocalISO(new Date());
 
-    const ventasHoy = historialVentas.filter(v=>fechaLocalISO(v.fecha)===hoy);
+    const mesActual = hoy.slice(0, 7);
+
+    const ventasHoy = historialVentas.filter(v => fechaLocalISO(v.fecha) === hoy);
 
     // Las ventas "DEBE" (fiado) todavía no se cobraron, no se suman
     // como plata del día.
@@ -18,43 +18,54 @@ function renderDashboard(){
         .filter(v => v.metodoPago !== "debe")
         .reduce((acc,v)=>acc+Number(v.total||0),0);
 
-    const totalGastos = gastos.reduce((acc,g)=>acc+Number(g.monto||0),0);
+    const fiadoHoy = ventasHoy
+        .filter(v => v.metodoPago === "debe")
+        .reduce((acc,v)=>acc+Number(v.total||0),0);
 
-    const ultimasVentas=[...historialVentas]
-    .sort((a,b)=>new Date(b.fecha)-new Date(a.fecha))
-    .slice(0,5);
+    const valorInventario = productos.reduce((acc,p)=>acc+(Number(p.precioBolsa||0)*Math.max(0, Number(p.stock||0))),0);
 
-    const pocoStock=productos
-    .filter(p=>Number(p.stock)<=Number(p.stockMinimo||5))
-    .sort((a,b)=>a.stock-b.stock)
-    .slice(0,8);
+    const gastosMes = gastos.filter(g => String(g.fecha || "").slice(0, 7) === mesActual);
 
-    const hoyISO = fechaLocalISO(new Date());
+    const totalGastosMes = gastosMes.reduce((acc,g)=>acc+Number(g.monto||0),0);
+
+    const deudores = clientes.filter(c => Number(c.saldo || 0) > 0.01);
+
+    const totalPorCobrar = deudores.reduce((acc, c) => acc + Number(c.saldo || 0), 0);
+
+    const ultimasVentas = [...historialVentas]
+        .sort((a,b)=>new Date(b.fecha)-new Date(a.fecha))
+        .slice(0, Math.max(1, Number(cfg.cantidadVentas) || 5));
+
+    const pocoStock = productos
+        .filter(productoConStockBajo)
+        .sort((a,b)=>Number(a.stock || 0)-Number(b.stock || 0))
+        .slice(0,8);
 
     const pagosProveedorPendientes = [];
 
-    proveedores.forEach(prov =>{
+    if(puede("proveedores")){
 
-        (prov.compras || []).forEach(c =>{
+        proveedores.forEach(prov =>{
 
-            if(Number(c.saldoPendiente || 0) > 0.01 && c.fechaVencimiento && c.fechaVencimiento <= hoyISO){
+            (prov.compras || []).forEach(c =>{
 
-                pagosProveedorPendientes.push({
+                if(Number(c.saldoPendiente || 0) > 0.01 && c.fechaVencimiento && c.fechaVencimiento <= hoy){
 
-                    proveedor: prov.nombre,
-                    proveedorId: prov.id,
-                    descripcion: c.descripcion,
-                    monto: c.saldoPendiente,
-                    vencido: c.fechaVencimiento < hoyISO,
-                    fechaVencimientoTexto: c.fechaVencimientoTexto
+                    pagosProveedorPendientes.push({
+                        proveedor: prov.nombre,
+                        descripcion: c.descripcion,
+                        monto: c.saldoPendiente,
+                        vencido: c.fechaVencimiento < hoy,
+                        fechaVencimientoTexto: c.fechaVencimientoTexto || fechaTextoDeISO(c.fechaVencimiento)
+                    });
 
-                });
+                }
 
-            }
+            });
 
         });
 
-    });
+    }
 
     pagosProveedorPendientes.sort((a, b) => (b.vencido - a.vencido));
 
@@ -67,8 +78,8 @@ function renderDashboard(){
                 ${pagosProveedorPendientes.map(p => `
                     <div class="ventaDashboard">
                         <div>
-                            <strong>${p.proveedor}</strong>
-                            <small>${p.descripcion} ${p.vencido ? "— vencido el " + p.fechaVencimientoTexto : "— vence hoy"}</small>
+                            <strong>${esc(p.proveedor)}</strong>
+                            <small>${esc(p.descripcion)} ${p.vencido ? "— vencido el " + esc(p.fechaVencimientoTexto) : "— vence hoy"}</small>
                         </div>
                         <span class="saldoDeuda">${dinero(p.monto)}</span>
                     </div>
@@ -82,19 +93,32 @@ function renderDashboard(){
         <div class="cardMetrica">
             <small>💰 Ventas de hoy</small>
             <h2>${dinero(totalVentasHoy)}</h2>
-            <span class="subMetrica">${ventasHoy.length} ventas</span>
+            <span class="subMetrica">${ventasHoy.length} ventas${fiadoHoy > 0 ? " · fiado: " + dinero(fiadoHoy) : ""}</span>
         </div>
 
+        <div class="cardMetrica">
+            <small>💳 Por cobrar</small>
+            <h2>${dinero(totalPorCobrar)}</h2>
+            <span class="subMetrica">${deudores.length} cliente(s) con deuda</span>
+        </div>
+
+        ${esAdmin() ? `
         <div class="cardMetrica">
             <small>📦 Valor inventario</small>
             <h2>${dinero(valorInventario)}</h2>
-            <span class="subMetrica">${totalProductos} productos</span>
+            <span class="subMetrica">${productos.length} productos</span>
         </div>
 
         <div class="cardMetrica">
-            <small>🧾 Gastos</small>
-            <h2>${dinero(totalGastos)}</h2>
-            <span class="subMetrica">${gastos.length} registrados</span>
+            <small>🧾 Gastos del mes</small>
+            <h2>${dinero(totalGastosMes)}</h2>
+            <span class="subMetrica">${gastosMes.length} registrados</span>
+        </div>
+        ` : `
+        <div class="cardMetrica">
+            <small>📦 Productos</small>
+            <h2>${productos.length}</h2>
+            <span class="subMetrica">${pocoStock.length ? "hay productos con poco stock" : "stock en orden"}</span>
         </div>
 
         <div class="cardMetrica">
@@ -102,78 +126,56 @@ function renderDashboard(){
             <h2>${clientes.length}</h2>
             <span class="subMetrica">registrados</span>
         </div>
+        `}
 
     </div>
 
     <div class="dashboardResumen">
 
+        ${cfg.mostrarUltimasVentas ? `
         <div class="card">
 
             <h2>🧾 Últimas ventas</h2>
 
             ${
                 ultimasVentas.length
-
                 ?
-
                 ultimasVentas.map(v=>`
-
                     <div class="ventaDashboard">
-
                         <div>
-
-                            <strong>${(v.cliente && v.cliente.nombre) ? v.cliente.nombre : "Consumidor Final"}</strong>
-
-                            <small>${fechaHoraTexto(v.fecha)}</small>
-
+                            <strong>${esc(nombreClienteVenta(v))}</strong>
+                            <small>${esc(fechaHoraTexto(v.fecha))}${v.metodoPago === "debe" && pendienteVenta(v) > 0 ? " · DEBE" : ""}</small>
                         </div>
-
                         <span>${dinero(v.total)}</span>
-
                     </div>
-
                 `).join("")
-
                 :
-
                 `<p>No hay ventas registradas.</p>`
-
             }
 
         </div>
+        ` : ""}
 
+        ${cfg.mostrarStock ? `
         <div class="card">
 
             <h2>⚠ Productos con poco stock</h2>
 
             ${
                 pocoStock.length
-
                 ?
-
                 pocoStock.map(p=>`
-
                     <div class="stockDashboard">
-
-                        <strong>${p.nombre}</strong>
-
-                        <span class="stockRojo">
-
-                            ${formatearStock(p.stock)}
-
-                        </span>
-
+                        <strong>${esc(p.nombre)}</strong>
+                        <span class="stockRojo">${formatearStock(p.stock)}</span>
                     </div>
-
                 `).join("")
-
                 :
-
                 `<p>No hay productos con poco stock.</p>`
-
             }
 
         </div>
+        ` : ""}
 
     </div>
 
