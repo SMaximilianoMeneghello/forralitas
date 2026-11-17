@@ -3,9 +3,12 @@
 ========================================== */
 
 let productoEditandoId = null;
+let stockAlAbrirProducto = null;
 let filtroProductos = "";
 
 function renderProductos(){
+
+    const editar = puede("editarProductos");
 
     contenido().innerHTML = `
 
@@ -25,13 +28,13 @@ function renderProductos(){
                     type="button">✕</button>
             </div>
 
-            <button
-                id="btnAgregarProducto"
-                class="btnAgregar">
+            <label class="filtroCheck">
+                <input type="checkbox" id="soloStockBajo"> Solo con poco stock
+            </label>
 
-                + Agregar producto
+            <button id="btnExportarProductos" class="btnSecundario">⬇ Exportar a Excel</button>
 
-            </button>
+            ${editar ? `<button id="btnAgregarProducto" class="btnAgregar">+ Agregar producto</button>` : ""}
 
         </div>
 
@@ -42,7 +45,6 @@ function renderProductos(){
                 <table>
 
                     <thead>
-
                         <tr>
                             <th>Nombre</th>
                             <th>Categoría</th>
@@ -50,14 +52,11 @@ function renderProductos(){
                             <th>Precio Bolsa</th>
                             <th>Precio Kg</th>
                             <th>Stock</th>
-                            <th>Acciones</th>
+                            ${editar ? "<th>Acciones</th>" : ""}
                         </tr>
-
                     </thead>
 
-                    <tbody id="tablaProductosBody">
-
-                    </tbody>
+                    <tbody id="tablaProductosBody"></tbody>
 
                 </table>
 
@@ -70,6 +69,10 @@ function renderProductos(){
     const btnAgregar = document.getElementById("btnAgregarProducto");
 
     if(btnAgregar) btnAgregar.onclick = abrirModalNuevoProducto;
+
+    document.getElementById("btnExportarProductos").onclick = exportarProductosCSV;
+
+    document.getElementById("soloStockBajo").addEventListener("change", actualizarTablaProductos);
 
     filtroProductos = "";
 
@@ -102,26 +105,44 @@ function renderProductos(){
 
 }
 
-function actualizarTablaProductos(){
+function productoConStockBajo(producto){
 
-    const tbody = document.getElementById("tablaProductosBody");
+    return Number(producto.stock || 0) <= stockMinimoDe(producto);
 
-    if(!tbody) return;
+}
 
-    tbody.innerHTML = "";
+function productosFiltrados(){
 
-    const listaFiltrada = !filtroProductos
+    const soloBajo = !!(document.getElementById("soloStockBajo") || {}).checked;
+
+    let lista = !filtroProductos
         ? productos
         : productos.filter(p =>
             (p.nombre || "").toLowerCase().includes(filtroProductos)
             || (p.categoria || "").toLowerCase().includes(filtroProductos)
         );
 
+    if(soloBajo) lista = lista.filter(productoConStockBajo);
+
+    return lista;
+
+}
+
+function actualizarTablaProductos(){
+
+    const tbody = document.getElementById("tablaProductosBody");
+
+    if(!tbody) return;
+
+    const editar = puede("editarProductos");
+
+    const columnas = editar ? 7 : 6;
+
     if(productos.length === 0){
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="tablaVacia">
+                <td colspan="${columnas}" class="tablaVacia">
                     Todavía no hay productos cargados.
                 </td>
             </tr>
@@ -131,12 +152,14 @@ function actualizarTablaProductos(){
 
     }
 
+    const listaFiltrada = productosFiltrados();
+
     if(listaFiltrada.length === 0){
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="tablaVacia">
-                    No se encontraron productos para "${filtroProductos}".
+                <td colspan="${columnas}" class="tablaVacia">
+                    No se encontraron productos${filtroProductos ? ` para "${esc(filtroProductos)}"` : ""}.
                 </td>
             </tr>
         `;
@@ -145,58 +168,98 @@ function actualizarTablaProductos(){
 
     }
 
-    listaFiltrada.forEach(producto =>{
+    tbody.innerHTML = listaFiltrada.map(producto =>{
 
-        const stockBajo = producto.stock <= (producto.stockMinimo || 0);
-
-        const stockHtml = stockBajo
+        const stockHtml = productoConStockBajo(producto)
             ? `<span class="stockBajo">${formatearStock(producto.stock)}</span>`
             : formatearStock(producto.stock);
 
-        tbody.innerHTML += `
+        return `
             <tr>
-                <td><strong>${producto.nombre}</strong></td>
-                <td>${producto.categoria || "—"}</td>
-                <td>${producto.pesoBolsa || 0} kg</td>
+                <td><strong>${esc(producto.nombre)}</strong></td>
+                <td>${esc(producto.categoria || "—")}</td>
+                <td>${esc(producto.pesoBolsa || 0)} kg</td>
                 <td>${dinero(producto.precioBolsa)}</td>
                 <td>${dinero(producto.precioKg)}</td>
                 <td>${stockHtml}</td>
+                ${editar ? `
                 <td class="accionesTabla">
                     <button
                         class="btnAccion btnEditar"
                         title="Editar"
-                        onclick="editarProducto('${producto.id}')">
+                        onclick="editarProducto('${esc(producto.id)}')">
                         ✏️
                     </button>
                     <button
                         class="btnAccion btnBorrar"
                         title="Eliminar"
-                        onclick="eliminarProducto('${producto.id}')">
+                        onclick="eliminarProducto('${esc(producto.id)}')">
                         🗑️
                     </button>
                 </td>
+                ` : ""}
             </tr>
         `;
 
+    }).join("");
+
+}
+
+function exportarProductosCSV(){
+
+    const filas = [["Nombre", "Categoría", "Peso por bolsa (kg)", "Precio bolsa", "Precio kg", "Stock (bolsas)", "Stock mínimo"]];
+
+    productosFiltrados().forEach(p =>{
+
+        filas.push([
+            p.nombre,
+            p.categoria || "",
+            Number(p.pesoBolsa || 0),
+            Number(p.precioBolsa || 0),
+            Number(p.precioKg || 0),
+            Number(p.stock || 0),
+            Number(p.stockMinimo || 0)
+        ]);
+
     });
+
+    descargarArchivo("Productos_" + fechaLocalISO(new Date()) + ".csv", generarCSV(filas), "text/csv;charset=utf-8");
+
+    notificacion("Lista de productos exportada.");
+
+}
+
+const CAMPOS_MODAL_PRODUCTO = [
+    "nombreProducto",
+    "categoriaProducto",
+    "pesoBolsa",
+    "precioBolsaProducto",
+    "precioKgProducto",
+    "stockProducto",
+    "stockMinimoProducto",
+    "costoBolsaProducto",
+    "separarProducto",
+    "grupoSepararProducto"
+];
+
+function mostrarCamposAdminProducto(){
+
+    // Costo y "separar" son datos internos del negocio: solo el admin.
+    document.getElementById("camposAdminProducto").classList.toggle("oculto", !esAdmin());
 
 }
 
 function abrirModalNuevoProducto(){
 
+    if(!puede("editarProductos")){ avisarSinPermiso(); return; }
+
     productoEditandoId = null;
 
     document.getElementById("tituloModalProducto").textContent = "Nuevo Producto";
 
-    limpiar(
-        "nombreProducto",
-        "categoriaProducto",
-        "pesoBolsa",
-        "precioBolsaProducto",
-        "precioKgProducto",
-        "stockProducto",
-        "stockMinimoProducto"
-    );
+    limpiar(...CAMPOS_MODAL_PRODUCTO);
+
+    mostrarCamposAdminProducto();
 
     abrir("modalProducto");
 
@@ -206,6 +269,8 @@ function abrirModalNuevoProducto(){
 
 function editarProducto(id){
 
+    if(!puede("editarProductos")){ avisarSinPermiso(); return; }
+
     const producto = productos.find(p => p.id === id);
 
     if(!producto) return;
@@ -214,19 +279,34 @@ function editarProducto(id){
 
     document.getElementById("tituloModalProducto").textContent = "Editar Producto";
 
-    document.getElementById("nombreProducto").value = producto.nombre || "";
-    document.getElementById("categoriaProducto").value = producto.categoria || "";
-    document.getElementById("pesoBolsa").value = producto.pesoBolsa || "";
-    document.getElementById("precioBolsaProducto").value = producto.precioBolsa || "";
-    document.getElementById("precioKgProducto").value = producto.precioKg || "";
-    document.getElementById("stockProducto").value = producto.stock || "";
-    document.getElementById("stockMinimoProducto").value = producto.stockMinimo || "";
+    const poner = (idCampo, valor) =>{
+
+        document.getElementById(idCampo).value = (valor === undefined || valor === null) ? "" : valor;
+
+    };
+
+    poner("nombreProducto", producto.nombre);
+    poner("categoriaProducto", producto.categoria);
+    poner("pesoBolsa", producto.pesoBolsa || "");
+    poner("precioBolsaProducto", producto.precioBolsa || "");
+    poner("precioKgProducto", producto.precioKg || "");
+    poner("stockProducto", producto.stock !== undefined ? formatearStock(producto.stock) : "");
+
+    stockAlAbrirProducto = numeroDe("stockProducto");
+    poner("stockMinimoProducto", producto.stockMinimo || "");
+    poner("costoBolsaProducto", producto.costoBolsa || "");
+    poner("separarProducto", producto.separarPorBolsa || "");
+    poner("grupoSepararProducto", producto.grupoSeparar || "");
+
+    mostrarCamposAdminProducto();
 
     abrir("modalProducto");
 
 }
 
 function guardarProducto(){
+
+    if(!puede("editarProductos")){ avisarSinPermiso(); return; }
 
     const nombre = document.getElementById("nombreProducto").value.trim();
 
@@ -238,17 +318,36 @@ function guardarProducto(){
 
     }
 
-    const categoria = document.getElementById("categoriaProducto").value.trim();
+    const repetido = productos.find(p =>
+        p.id !== productoEditandoId
+        && normalizarNombreProducto(p.nombre) === normalizarNombreProducto(nombre)
+    );
 
-    const pesoBolsa = Number(document.getElementById("pesoBolsa").value) || 0;
+    if(repetido){
 
-    const precioBolsa = Number(document.getElementById("precioBolsaProducto").value) || 0;
+        notificacion("Ya existe un producto llamado \"" + repetido.nombre + "\".", "warning");
 
-    const precioKg = Number(document.getElementById("precioKgProducto").value) || 0;
+        return;
 
-    const stock = Number(document.getElementById("stockProducto").value) || 0;
+    }
 
-    const stockMinimo = Number(document.getElementById("stockMinimoProducto").value) || 0;
+    const datos = {
+        nombre,
+        categoria: document.getElementById("categoriaProducto").value.trim(),
+        pesoBolsa: numeroDe("pesoBolsa"),
+        precioBolsa: numeroDe("precioBolsaProducto"),
+        precioKg: numeroDe("precioKgProducto"),
+        stock: numeroDe("stockProducto"),
+        stockMinimo: numeroDe("stockMinimoProducto")
+    };
+
+    if(esAdmin()){
+
+        datos.costoBolsa = numeroDe("costoBolsaProducto");
+        datos.separarPorBolsa = numeroDe("separarProducto");
+        datos.grupoSeparar = document.getElementById("grupoSepararProducto").value.trim();
+
+    }
 
     if(productoEditandoId){
 
@@ -256,13 +355,12 @@ function guardarProducto(){
 
         if(producto){
 
-            producto.nombre = nombre;
-            producto.categoria = categoria;
-            producto.pesoBolsa = pesoBolsa;
-            producto.precioBolsa = precioBolsa;
-            producto.precioKg = precioKg;
-            producto.stock = stock;
-            producto.stockMinimo = stockMinimo;
+            // Si mientras se editaba se vendió este producto en otra caja, el
+            // stock que figura en el formulario quedó viejo: solo se cambia
+            // si la persona realmente tocó el campo.
+            if(datos.stock === stockAlAbrirProducto) delete datos.stock;
+
+            Object.assign(producto, datos);
 
             notificacion("Producto actualizado.");
 
@@ -270,25 +368,13 @@ function guardarProducto(){
 
     }else{
 
-        productos.push({
-
-            id: "P" + Date.now(),
-
-            nombre,
-            categoria,
-            pesoBolsa,
-            precioBolsa,
-            precioKg,
-            stock,
-            stockMinimo
-
-        });
+        productos.push({ id: nuevoId("P"), ...datos });
 
         notificacion("Producto agregado correctamente.");
 
     }
 
-    guardarDatos();
+    guardarDatos("productos");
 
     cerrarModalProducto();
 
@@ -300,37 +386,49 @@ function guardarProducto(){
 
 function eliminarProducto(id){
 
+    if(!puede("editarProductos")){ avisarSinPermiso(); return; }
+
     const producto = productos.find(p => p.id === id);
 
     if(!producto) return;
 
+    if(carrito.some(item => item.id === id)){
+
+        notificacion("Ese producto está cargado en la venta en curso. Quitalo de la venta primero.", "warning");
+
+        return;
+
+    }
+
+    const enMezclas = mezclas.filter(m =>
+        (m.productoSalida && m.productoSalida.id === id)
+        || (m.ingredientes || []).some(i => i.idProducto === id)
+    );
+
+    const aviso = enMezclas.length
+        ? " Ojo: se usa en la(s) mezcla(s) " + enMezclas.map(m => m.nombre).join(", ") + "."
+        : "";
+
     confirmar(
-
-        "¿Eliminar el producto " + producto.nombre + "?",
-
+        "¿Eliminar el producto " + producto.nombre + "?" + aviso,
         ()=>{
 
             productos = productos.filter(p => p.id !== id);
 
             registrarEliminacion(
-
                 "Producto",
-
                 "Producto " + producto.nombre
                 + " · Stock: " + formatearStock(producto.stock),
-
                 producto
-
             );
 
-            guardarDatos();
+            guardarDatos("productos", "eliminaciones");
 
             actualizarTablaProductos();
 
             notificacion("Producto eliminado.", "error");
 
         }
-
     );
 
 }

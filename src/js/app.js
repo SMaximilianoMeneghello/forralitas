@@ -1,8 +1,8 @@
 /* ==========================================
-   FORRALITAS APP V2
+   APP - ARRANQUE, DATOS Y NAVEGACIÓN
 ========================================== */
 
-// VARIABLES GLOBALES
+// VARIABLES GLOBALES (tablas de la app)
 
 let productos = [];
 let clientes = [];
@@ -21,23 +21,37 @@ let productoSeleccionado = null;
 
 // Página actual
 
-let paginaActual = "dashboard";
+let paginaActual = "Dashboard";
+
+// Conexión con la nube
+
+let gestorSync = null;
+let adaptadorActual = null;
+let conexionActual = null;
+let appLogueadaIniciada = false;
 
 /* ==========================================
-   TABLAS QUE SE SINCRONIZAN CON FIREBASE
+   TABLAS QUE SE SINCRONIZAN
    (el carrito queda solo local: es la venta en
    curso de ESTA computadora, no debe compartirse)
+
+   - clave: campo que identifica cada registro.
+   - alInicio: la app agrega los registros nuevos
+     al principio de la lista.
 ========================================== */
 
 const ENTIDADES_SINCRONIZADAS = [
-    { nombre: "productos", obtener: () => productos, asignar: v => productos = v },
-    { nombre: "clientes", obtener: () => clientes, asignar: v => clientes = v },
-    { nombre: "proveedores", obtener: () => proveedores, asignar: v => proveedores = v },
-    { nombre: "gastos", obtener: () => gastos, asignar: v => gastos = v },
-    { nombre: "historialVentas", obtener: () => historialVentas, asignar: v => historialVentas = v },
-    { nombre: "eliminaciones", obtener: () => eliminaciones, asignar: v => eliminaciones = v },
-    { nombre: "mezclas", obtener: () => mezclas, asignar: v => mezclas = v },
-    { nombre: "carpetasNotas", obtener: () => carpetasNotas, asignar: v => carpetasNotas = v }
+    { nombre: "productos", clave: "id", prefijoId: "P", obtener: () => productos, asignar: v => productos = v },
+    { nombre: "clientes", clave: "id", prefijoId: "C", obtener: () => clientes, asignar: v => clientes = v },
+    { nombre: "proveedores", clave: "id", prefijoId: "PR", obtener: () => proveedores, asignar: v => proveedores = v },
+    { nombre: "gastos", clave: "id", prefijoId: "G", obtener: () => gastos, asignar: v => gastos = v },
+    { nombre: "historialVentas", clave: "id", prefijoId: "V", alInicio: true, obtener: () => historialVentas, asignar: v => historialVentas = v },
+    { nombre: "eliminaciones", clave: "id", prefijoId: "E", alInicio: true, obtener: () => eliminaciones, asignar: v => eliminaciones = v },
+    { nombre: "mezclas", clave: "id", prefijoId: "M", alInicio: true, obtener: () => mezclas, asignar: v => mezclas = v },
+    { nombre: "carpetasNotas", clave: "id", prefijoId: "N", alInicio: true, obtener: () => carpetasNotas, asignar: v => carpetasNotas = v },
+    { nombre: "usuarios", clave: "usuario", obtener: () => usuarios, asignar: v => usuarios = v },
+    { nombre: "preciosClientes", clave: "id", prefijoId: "PC", obtener: () => preciosClientesCache, asignar: v => preciosClientesCache = v },
+    { nombre: "configuracionSistema", clave: null, vacio: () => JSON.parse(JSON.stringify(CONFIG_DEFAULT)), obtener: () => configuracionSistema, asignar: v => configuracionSistema = v }
 ];
 
 /* ==========================================
@@ -46,41 +60,240 @@ const ENTIDADES_SINCRONIZADAS = [
 
 document.addEventListener("DOMContentLoaded", iniciarApp);
 
+function hayNube(){
+
+    let apagada = false;
+
+    try{ apagada = localStorage.getItem("__sinNube") === "1"; }catch(e){ /* nada */ }
+
+    return !!window.FirebaseDB && !apagada;
+
+}
+
+function leerConexion(){
+
+    try{
+
+        const c = JSON.parse(localStorage.getItem("conexionNegocio"));
+
+        return (c && (c.modo === "clasico" || c.modo === "cuenta")) ? c : null;
+
+    }catch(e){
+
+        return null;
+
+    }
+
+}
+
+function guardarConexion(c){
+
+    if(c) localStorage.setItem("conexionNegocio", JSON.stringify(c));
+    else localStorage.removeItem("conexionNegocio");
+
+}
+
+/* Una PC que ya venía usando el programa tiene datos guardados
+   del modo clásico: sigue funcionando igual que siempre. */
+function hayDatosLocalesClasicos(){
+
+    return ["usuarios", "productos", "historialVentas", "clientes"]
+        .some(k => localStorage.getItem(k) !== null);
+
+}
+
 async function iniciarApp(){
 
-    await cargarDatos();
+    mostrarPantallaInicio("Cargando…");
 
-    await cargarUsuarios();
+    try{
 
-    await sincronizarConfiguracionFirebase();
+        carrito = JSON.parse(localStorage.getItem("carrito")) || [];
 
-    await inicializarPreciosClientesFirebase();
+    }catch(e){
+
+        carrito = [];
+
+    }
+
+    let conexion = leerConexion();
+
+    if(!conexion){
+
+        if(!hayNube() || hayDatosLocalesClasicos()){
+
+            conexion = { modo: "clasico" };
+
+            guardarConexion(conexion);
+
+        }else{
+
+            // Instalación nueva: hay que decir de qué negocio es esta PC.
+            mostrarPantallaConexion();
+
+            return;
+
+        }
+
+    }
+
+    await conectarYArrancar(conexion);
+
+}
+
+async function conectarYArrancar(conexion){
+
+    mostrarPantallaInicio("Cargando datos…");
+
+    let adaptador = null;
+
+    if(hayNube()){
+
+        if(conexion.modo === "cuenta"){
+
+            const cuenta = await window.FirebaseDB.cuenta.esperarInicial();
+
+            if(!cuenta || cuenta.uid !== conexion.uid){
+
+                mostrarPantallaConexion({
+                    email: conexion.email || "",
+                    aviso: "Ingresá de nuevo la cuenta del negocio para seguir."
+                });
+
+                return;
+
+            }
+
+            adaptador = window.FirebaseDB.adaptadorCuenta(cuenta.uid);
+
+            AlmacenLocal.usarPrefijo("n:" + cuenta.uid + ":");
+
+        }else{
+
+            adaptador = window.FirebaseDB.adaptadorClasico();
+
+            AlmacenLocal.usarPrefijo("");
+
+        }
+
+    }
+
+    conexionActual = conexion;
+    adaptadorActual = adaptador;
+
+    if(gestorSync) gestorSync.detener();
+
+    gestorSync = crearGestorSync({
+        adaptador,
+        almacen: AlmacenLocal,
+        tablas: ENTIDADES_SINCRONIZADAS.map(e => ({
+            ...e,
+            vacio: e.vacio || (() => (e.clave ? [] : {}))
+        })),
+        alCambiar: programarRefrescoRemoto,
+        alEstado: actualizarIndicadorSync
+    });
+
+    await gestorSync.iniciar();
+
+    completarConfiguracion();
+
+    migrarDatos();
+
+    aplicarTema();
+
+    aplicarDatosNegocio();
+
+    // Modo clásico: ¿el negocio ya se pasó a "cuenta"? Entonces esta PC
+    // tiene que ingresar con la cuenta para seguir viendo los datos.
+    if(adaptador && conexion.modo === "clasico" && await negocioMigradoACuenta(adaptador)){
+
+        gestorSync.detener();
+
+        mostrarPantallaConexion({
+            sinClasico: true,
+            aviso: "Este negocio ahora usa una cuenta. Ingresá el email y la clave del negocio en esta PC."
+        });
+
+        return;
+
+    }
 
     iniciarEventosLogin();
 
-   if(sesionActiva()){
+    if(usuarios.length === 0){
 
-    ocultarLogin();
+        const info = gestorSync.info("usuarios");
 
-    iniciarAppLogueada();
+        if(!adaptador || (info && info.confirmado)){
 
-}else{
+            // Negocio nuevo: todavía no tiene ningún usuario.
+            mostrarPantallaPrimerAdmin();
 
-    mostrarLogin();
+        }else{
+
+            mostrarPantallaSinConexionInicial();
+
+        }
+
+        return;
+
+    }
+
+    if(sesionActiva()){
+
+        ocultarLogin();
+
+        iniciarAppLogueada();
+
+    }else{
+
+        mostrarLogin();
+
+    }
 
 }
+
+async function negocioMigradoACuenta(adaptador){
+
+    if(gestorSync.estado().sinPermiso) return true;
+
+    try{
+
+        const marca = await Promise.race([
+            adaptador.leer("_migrado"),
+            new Promise(r => setTimeout(() => r(null), 4000))
+        ]);
+
+        return !!marca;
+
+    }catch(e){
+
+        return e && e.code === "permission-denied";
+
+    }
 
 }
 
 function iniciarAppLogueada(){
 
-    iniciarEventos();
+    if(!appLogueadaIniciada){
 
-    iniciarModalesGlobales();
+        iniciarEventos();
+
+        iniciarModalesGlobales();
+
+        window.addEventListener("online", ()=>{ if(gestorSync) gestorSync.sincronizarAhora(); });
+
+        appLogueadaIniciada = true;
+
+    }
 
     aplicarPermisos();
 
     mostrarUsuarioActual();
+
+    actualizarIndicadorSync(gestorSync ? gestorSync.estado() : null);
 
     abrirDashboard();
 
@@ -88,196 +301,203 @@ function iniciarAppLogueada(){
 
 function iniciarModalesGlobales(){
 
-    const guardarProductoBtn = document.getElementById("guardarProducto");
+    const enlazar = (id, fn) =>{
 
-    if(guardarProductoBtn) guardarProductoBtn.onclick = guardarProducto;
+        const el = document.getElementById(id);
 
-    const guardarClienteBtn = document.getElementById("guardarCliente");
+        if(el) el.onclick = fn;
 
-    if(guardarClienteBtn) guardarClienteBtn.onclick = guardarCliente;
+    };
 
-    const guardarPrecioBtn = document.getElementById("guardarPrecioCliente");
+    enlazar("guardarProducto", guardarProducto);
+    enlazar("guardarCliente", guardarCliente);
+    enlazar("guardarPrecioCliente", guardarPrecioCliente);
+    enlazar("guardarPagoCliente", guardarPagoCliente);
 
-    if(guardarPrecioBtn) guardarPrecioBtn.onclick = guardarPrecioCliente;
+    enlazar("btnEfectivoPagoCliente", () => cambiarMetodoPagoCliente("efectivo"));
+    enlazar("btnTransferenciaPagoCliente", () => cambiarMetodoPagoCliente("transferencia"));
+    enlazar("btnMixtoPagoCliente", () => cambiarMetodoPagoCliente("mixto"));
 
-    const guardarPagoBtn = document.getElementById("guardarPagoCliente");
+    enlazar("btnVolverClientes", cerrarPantallaClienteDetalle);
+    enlazar("btnVolverDetallePrecios", cerrarPantallaPreciosCliente);
 
-    if(guardarPagoBtn) guardarPagoBtn.onclick = guardarPagoCliente;
+    enlazar("guardarGasto", guardarGasto);
 
-    const btnEfectivoPagoCliente = document.getElementById("btnEfectivoPagoCliente");
-    const btnTransferenciaPagoCliente = document.getElementById("btnTransferenciaPagoCliente");
-    const btnMixtoPagoCliente = document.getElementById("btnMixtoPagoCliente");
+    enlazar("btnEfectivoGasto", () => cambiarMetodoPagoGasto("efectivo"));
+    enlazar("btnTransferenciaGasto", () => cambiarMetodoPagoGasto("transferencia"));
+    enlazar("btnMixtoGasto", () => cambiarMetodoPagoGasto("mixto"));
 
-    if(btnEfectivoPagoCliente) btnEfectivoPagoCliente.onclick = () => cambiarMetodoPagoCliente("efectivo");
-    if(btnTransferenciaPagoCliente) btnTransferenciaPagoCliente.onclick = () => cambiarMetodoPagoCliente("transferencia");
-    if(btnMixtoPagoCliente) btnMixtoPagoCliente.onclick = () => cambiarMetodoPagoCliente("mixto");
+    enlazar("guardarProveedor", guardarProveedor);
+    enlazar("btnVolverProveedores", cerrarPantallaProveedorDetalle);
+    enlazar("guardarCompraProveedor", guardarCompraProveedor);
+    enlazar("guardarPagoProveedor", guardarPagoProveedor);
 
-    const btnVolverClientes = document.getElementById("btnVolverClientes");
+    enlazar("btnVolverAnotaciones", cerrarPantallaAnotacionDetalle);
 
-    if(btnVolverClientes) btnVolverClientes.onclick = cerrarPantallaClienteDetalle;
+    enlazar("guardarMezcla", guardarMezcla);
+    enlazar("btnVolverMezclas", cerrarPantallaMezclaDetalle);
+    enlazar("guardarProduccionMezcla", guardarProduccionMezcla);
 
-    const btnVolverDetallePrecios = document.getElementById("btnVolverDetallePrecios");
-
-    if(btnVolverDetallePrecios) btnVolverDetallePrecios.onclick = cerrarPantallaPreciosCliente;
-
-    const guardarGastoBtn = document.getElementById("guardarGasto");
-
-    if(guardarGastoBtn) guardarGastoBtn.onclick = guardarGasto;
-
-    const btnEfectivoGasto = document.getElementById("btnEfectivoGasto");
-    const btnTransferenciaGasto = document.getElementById("btnTransferenciaGasto");
-    const btnMixtoGasto = document.getElementById("btnMixtoGasto");
-
-    if(btnEfectivoGasto) btnEfectivoGasto.onclick = () => cambiarMetodoPagoGasto("efectivo");
-    if(btnTransferenciaGasto) btnTransferenciaGasto.onclick = () => cambiarMetodoPagoGasto("transferencia");
-    if(btnMixtoGasto) btnMixtoGasto.onclick = () => cambiarMetodoPagoGasto("mixto");
-
-    const guardarProveedorBtn = document.getElementById("guardarProveedor");
-
-    if(guardarProveedorBtn) guardarProveedorBtn.onclick = guardarProveedor;
-
-    const btnVolverProveedores = document.getElementById("btnVolverProveedores");
-
-    if(btnVolverProveedores) btnVolverProveedores.onclick = cerrarPantallaProveedorDetalle;
-
-    const guardarCompraProveedorBtn = document.getElementById("guardarCompraProveedor");
-
-    if(guardarCompraProveedorBtn) guardarCompraProveedorBtn.onclick = guardarCompraProveedor;
-
-    const guardarPagoProveedorBtn = document.getElementById("guardarPagoProveedor");
-
-    if(guardarPagoProveedorBtn) guardarPagoProveedorBtn.onclick = guardarPagoProveedor;
-
-    const btnVolverAnotaciones = document.getElementById("btnVolverAnotaciones");
-
-    if(btnVolverAnotaciones) btnVolverAnotaciones.onclick = cerrarPantallaAnotacionDetalle;
-
-    const guardarMezclaBtn = document.getElementById("guardarMezcla");
-
-    if(guardarMezclaBtn) guardarMezclaBtn.onclick = guardarMezcla;
+    enlazar("guardarUsuarioAdmin", guardarUsuarioAdmin);
+    enlazar("guardarVentaEditada", guardarVentaEditada);
+    enlazar("guardarPagoEditado", guardarPagoEditado);
 
     const buscadorSalidaMezcla = document.getElementById("buscadorSalidaMezcla");
 
     if(buscadorSalidaMezcla) activarBuscadorProductoMezcla(buscadorSalidaMezcla);
 
-    const btnVolverMezclas = document.getElementById("btnVolverMezclas");
+}
 
-    if(btnVolverMezclas) btnVolverMezclas.onclick = cerrarPantallaMezclaDetalle;
+/* ==========================================
+   GUARDAR
+   Se llama después de cada cambio. Guarda en
+   esta PC al instante y lo sube a la nube.
+   Se le puede indicar qué tablas cambiaron
+   (más rápido): guardarDatos("productos").
+========================================== */
 
-    const guardarProduccionMezclaBtn = document.getElementById("guardarProduccionMezcla");
+function guardarDatos(...tablas){
 
-    if(guardarProduccionMezclaBtn) guardarProduccionMezclaBtn.onclick = guardarProduccionMezcla;
+    try{
+
+        localStorage.setItem("carrito", JSON.stringify(carrito));
+
+    }catch(e){ /* nada */ }
+
+    if(gestorSync) gestorSync.guardar(tablas);
 
 }
 
 /* ==========================================
-   CARGAR DATOS
+   CAMBIOS QUE LLEGAN DE OTRA COMPUTADORA
 ========================================== */
 
-async function cargarDatos(){
+let refrescoPendiente = null;
+let tablasCambiadasRemoto = new Set();
 
-    // Copia local: sirve de respaldo si no hay internet y hace que la
-    // app abra al instante mientras se consulta a Firebase.
-    productos = JSON.parse(localStorage.getItem("productos")) || [];
+function programarRefrescoRemoto(nombre){
 
-    clientes = JSON.parse(localStorage.getItem("clientes")) || [];
+    tablasCambiadasRemoto.add(nombre);
 
-    proveedores = JSON.parse(localStorage.getItem("proveedores")) || [];
+    if(refrescoPendiente) return;
 
-    gastos = JSON.parse(localStorage.getItem("gastos")) || [];
+    refrescoPendiente = setTimeout(()=>{
 
-    historialVentas = JSON.parse(localStorage.getItem("historialVentas")) || [];
+        refrescoPendiente = null;
 
-    eliminaciones = JSON.parse(localStorage.getItem("eliminaciones")) || [];
+        const cambiadas = tablasCambiadasRemoto;
 
-    mezclas = JSON.parse(localStorage.getItem("mezclas")) || [];
+        tablasCambiadasRemoto = new Set();
 
-    carpetasNotas = JSON.parse(localStorage.getItem("carpetasNotas")) || [];
+        if(cambiadas.has("configuracionSistema")){
 
-    carrito = JSON.parse(localStorage.getItem("carrito")) || [];
+            completarConfiguracion();
 
-    if(!window.FirebaseDB){
+            aplicarTema();
 
-        return; // Firebase no disponible: se sigue trabajando solo local.
-
-    }
-
-    await Promise.all(ENTIDADES_SINCRONIZADAS.map(async (ent) =>{
-
-        const remoto = await window.FirebaseDB.leerColeccion(ent.nombre);
-
-        if(remoto === undefined){
-
-            return; // Falla de conexión: seguimos con el respaldo local.
+            aplicarDatosNegocio();
 
         }
 
-        if(remoto === null){
+        revincularReferencias();
 
-            // Todavía no existe esa tabla en Firebase: subimos lo que
-            // ya había en esta computadora (primera migración).
-            window.FirebaseDB.guardarColeccion(ent.nombre, ent.obtener());
+        refrescarPantallaActual();
+
+    }, 40);
+
+}
+
+/* Cuando llegan datos nuevos, las listas se reemplazan. Lo que la
+   pantalla tenía "agarrado" (usuario, cliente de la venta, etc.) se
+   vuelve a buscar por su identificador para no trabajar con una
+   copia vieja. */
+function revincularReferencias(){
+
+    if(usuarioActual){
+
+        const u = usuarios.find(x => x.usuario === usuarioActual.usuario);
+
+        if(!u){
+
+            if(appLogueadaIniciada){
+
+                notificacion("Tu usuario fue eliminado por el administrador.", "warning");
+
+                cerrarSesion();
+
+            }
 
         }else{
 
-            ent.asignar(remoto);
+            const cambioRol = u.rol !== usuarioActual.rol;
 
-            localStorage.setItem(ent.nombre, JSON.stringify(remoto));
+            usuarioActual = u;
+
+            if(cambioRol && appLogueadaIniciada){
+
+                aplicarPermisos();
+
+                mostrarUsuarioActual();
+
+            }
 
         }
 
-    }));
+    }
 
-    activarSincronizacionEnVivo();
+    if(clienteSeleccionado){
+
+        clienteSeleccionado = clientes.find(c => c.id === clienteSeleccionado.id) || null;
+
+    }
+
+    if(typeof productoVenta !== "undefined" && productoVenta){
+
+        productoVenta = productos.find(p => p.id === productoVenta.id) || null;
+
+    }
 
 }
 
-/* ==========================================
-   SINCRONIZACIÓN EN VIVO
-   Cuando otra computadora cambia una tabla,
-   esta función actualiza los datos acá y
-   refresca la pantalla que esté abierta.
-========================================== */
+function pantallaVisible(id){
 
-function activarSincronizacionEnVivo(){
+    const el = document.getElementById(id);
 
-    ENTIDADES_SINCRONIZADAS.forEach(ent =>{
-
-        window.FirebaseDB.escucharColeccion(ent.nombre, (remoto) =>{
-
-            const actual = JSON.stringify(ent.obtener());
-
-            const nuevo = JSON.stringify(remoto);
-
-            if(actual === nuevo) return; // Sin cambios reales, no re-renderizamos.
-
-            ent.asignar(remoto);
-
-            localStorage.setItem(ent.nombre, nuevo);
-
-            refrescarPantallaActual();
-
-        });
-
-    });
+    return !!el && !el.classList.contains("oculto");
 
 }
 
 function refrescarPantallaActual(){
 
+    if(!usuarioActual || !appLogueadaIniciada) return;
+
+    // Pantallas de detalle abiertas.
+    if(pantallaVisible("pantallaPreciosCliente")){ renderListaPreciosRegistrados(); return; }
+
+    if(pantallaVisible("pantallaClienteDetalle")){ renderClienteDetalle(clienteDetalleActualId); return; }
+
+    if(pantallaVisible("pantallaProveedorDetalle")){ renderProveedorDetalle(proveedorDetalleActualId); return; }
+
+    if(pantallaVisible("pantallaMezclaDetalle")){ renderMezclaDetalle(mezclaDetalleActualId); return; }
+
+    // El bloc de notas no se refresca: se pisaría lo que se está escribiendo.
+    if(pantallaVisible("pantallaAnotacionDetalle")) return;
+
+    // Se actualizan solo las listas, sin perder lo que la persona
+    // estaba escribiendo o filtrando.
     const mapa = {
-        dashboard: renderDashboard,
         Dashboard: renderDashboard,
-        Ventas: renderVentas,
-        Productos: renderProductos,
-        Clientes: renderClientes,
-        Proveedores: renderProveedores,
-        Gastos: renderGastos,
-        Historial: renderHistorial,
-        Mezclas: renderMezclas,
-        Anotaciones: renderAnotaciones,
-        Reportes: renderReportes,
-        Eliminaciones: renderEliminaciones
+        Ventas: refrescarVentas,
+        Productos: actualizarTablaProductos,
+        Clientes: actualizarTablaClientes,
+        Proveedores: actualizarTablaProveedores,
+        Gastos: refrescarTablaGastosConFiltrosActuales,
+        Historial: buscarHistorial,
+        Mezclas: actualizarTablaMezclas,
+        Anotaciones: actualizarTablaAnotaciones,
+        Reportes: generarReporte,
+        Eliminaciones: renderEliminaciones,
+        Configuracion: actualizarTablaUsuariosAdmin
     };
 
     const fn = mapa[paginaActual];
@@ -287,37 +507,125 @@ function refrescarPantallaActual(){
 }
 
 /* ==========================================
-   GUARDAR
+   INDICADOR DE SINCRONIZACIÓN
 ========================================== */
 
-function guardarDatos(){
+function actualizarIndicadorSync(estado){
 
-    // Respaldo local instantáneo (por si se corta internet).
-    localStorage.setItem("productos", JSON.stringify(productos));
+    const el = document.getElementById("estadoSync");
 
-    localStorage.setItem("clientes", JSON.stringify(clientes));
+    if(!el) return;
 
-    localStorage.setItem("proveedores", JSON.stringify(proveedores));
+    let texto = "";
+    let clase = "";
+    let ayuda = "";
 
-    localStorage.setItem("gastos", JSON.stringify(gastos));
+    if(!estado || !estado.nube){
 
-    localStorage.setItem("historialVentas", JSON.stringify(historialVentas));
+        texto = "💾 Solo en esta PC";
+        ayuda = "Los datos se guardan únicamente en esta computadora.";
 
-    localStorage.setItem("eliminaciones", JSON.stringify(eliminaciones));
+    }else if(estado.sinPermiso){
 
-    localStorage.setItem("mezclas", JSON.stringify(mezclas));
+        texto = "⛔ Sin acceso a la nube";
+        clase = "error";
+        ayuda = "La base de datos rechazó la conexión. Revisá la cuenta del negocio.";
 
-    localStorage.setItem("carpetasNotas", JSON.stringify(carpetasNotas));
+    }else if(estado.pendientes > 0 && (estado.error || estado.confirmadas < estado.total)){
 
-    localStorage.setItem("carrito", JSON.stringify(carrito));
+        texto = "⚠ Sin conexión · " + estado.pendientes + " cambio(s) guardado(s) en esta PC";
+        clase = "alerta";
+        ayuda = "No se pierde nada: se suben solos cuando vuelva internet.";
 
-    if(!window.FirebaseDB) return;
+    }else if(estado.pendientes > 0){
 
-    ENTIDADES_SINCRONIZADAS.forEach(ent =>{
+        texto = "⏳ Subiendo cambios…";
+        clase = "subiendo";
 
-        window.FirebaseDB.guardarColeccion(ent.nombre, ent.obtener());
+    }else if(estado.confirmadas < estado.total){
 
-    });
+        texto = "⚠ Sin conexión";
+        clase = "alerta";
+        ayuda = "Se está trabajando con los datos guardados en esta PC.";
+
+    }else{
+
+        texto = "☁ Sincronizado";
+        clase = "ok";
+
+    }
+
+    el.textContent = texto;
+    el.title = ayuda;
+    el.className = "estadoSync " + clase;
+
+}
+
+/* ==========================================
+   MIGRACIONES DE DATOS
+   Ajustes que se hacen una sola vez sobre los
+   datos de versiones anteriores.
+========================================== */
+
+function migrarDatos(){
+
+    if(!configuracionSistema.migraciones) configuracionSistema.migraciones = {};
+
+    const hechas = configuracionSistema.migraciones;
+
+    let cambios = false;
+
+    // 1) "Separar por bolsa": antes estaba fijo en el código para
+    //    maíz y alfa; ahora es un dato de cada producto.
+    if(!hechas.separarPorProducto && productos.length){
+
+        const reglas = {
+            "MAIZX40KG": { monto: 11000, grupo: "Maíz" },
+            "MAIZX45KG": { monto: 12000, grupo: "Maíz" },
+            "MAIZX50KG": { monto: 12000, grupo: "Maíz" },
+            "ALFAVERDE": { monto: 5000, grupo: "Alfa" }
+        };
+
+        productos.forEach(p =>{
+
+            const regla = reglas[normalizarNombreProducto(p.nombre)];
+
+            if(regla && p.separarPorBolsa === undefined){
+
+                p.separarPorBolsa = regla.monto;
+                p.grupoSeparar = regla.grupo;
+
+            }
+
+        });
+
+        hechas.separarPorProducto = true;
+
+        cambios = true;
+
+    }
+
+    // 2) El usuario cuyas eliminaciones no quedaban registradas pasa a
+    //    ser una opción visible de cada usuario (la maneja el admin).
+    if(!hechas.usuarioSinRegistro && usuarios.length){
+
+        const u = usuarios.find(x => x.usuario === "maxiforralitas");
+
+        if(u && u.ocultarEliminaciones === undefined) u.ocultarEliminaciones = true;
+
+        hechas.usuarioSinRegistro = true;
+
+        cambios = true;
+
+    }
+
+    if(cambios) guardarDatos("productos", "usuarios", "configuracionSistema");
+
+}
+
+function normalizarNombreProducto(nombre){
+
+    return (nombre || "").toUpperCase().replace(/\s+/g, "");
 
 }
 
@@ -362,46 +670,26 @@ function cambiarPagina(nombre){
 
     document
         .querySelectorAll(".sidebar button")
-        .forEach(b=>b.classList.remove("activo"));
+        .forEach(b => b.classList.remove("activo"));
 
     const boton = document.getElementById(nombre);
 
     if(boton) boton.classList.add("activo");
 
     // Se ocultan las pantallas secundarias al cambiar de sección.
-    cerrarPantallaClienteDetalle();
+    ["pantallaClienteDetalle", "pantallaPreciosCliente", "pantallaAnotacionDetalle",
+     "pantallaProveedorDetalle", "pantallaMezclaDetalle"].forEach(id =>{
 
-    cerrarPantallaPreciosCliente();
+        const el = document.getElementById(id);
 
-    cerrarPantallaAnotacionDetalle();
+        if(el) el.classList.add("oculto");
 
-    cerrarPantallaProveedorDetalle();
+    });
 
-    cerrarPantallaMezclaDetalle();
+    const app = document.getElementById("appPrincipal");
 
-    const detalle=document.getElementById("pantallaClienteDetalle");
+    if(app) app.classList.remove("oculto");
 
-    if(detalle){
-
-    detalle.classList.add("oculto");
-
-}
-
-const precios=document.getElementById("pantallaPreciosCliente");
-
-if(precios){
-
-    precios.classList.add("oculto");
-
-}
-
-const app=document.getElementById("appPrincipal");
-
-if(app){
-
-    app.classList.remove("oculto");
-
-}
 }
 
 /* ==========================================
@@ -419,6 +707,19 @@ function titulo(texto){
     const el = document.getElementById("tituloPagina");
 
     if(el) el.textContent = texto;
+
+}
+
+function sinPermisoHtml(){
+
+    return `
+        <div class="card">
+            <p class="tablaVacia">
+                Tu usuario no tiene permiso para esta sección.
+                Pedile al administrador que lo habilite desde Configuración.
+            </p>
+        </div>
+    `;
 
 }
 
@@ -462,6 +763,9 @@ function abrirProveedores(){
 
     cambiarPagina("Proveedores");
     titulo("Proveedores");
+
+    if(!puede("proveedores")){ contenido().innerHTML = sinPermisoHtml(); return; }
+
     renderProveedores();
 
 }
@@ -486,6 +790,9 @@ function abrirMezclas(){
 
     cambiarPagina("Mezclas");
     titulo("Mezclas");
+
+    if(!puede("mezclas")){ contenido().innerHTML = sinPermisoHtml(); return; }
+
     renderMezclas();
 
 }
@@ -533,14 +840,14 @@ function abrirEliminaciones(){
 }
 
 /* ==========================================
-   PANTALLAS SECUNDARIAS (DETALLE CLIENTE / PRECIOS)
+   PANTALLAS SECUNDARIAS (DETALLES)
 ========================================== */
 
-function abrirPantallaClienteDetalle(){
+function mostrarPantallaDetalle(id){
 
     const app = document.getElementById("appPrincipal");
 
-    const pantalla = document.getElementById("pantallaClienteDetalle");
+    const pantalla = document.getElementById(id);
 
     if(app) app.classList.add("oculto");
 
@@ -548,19 +855,45 @@ function abrirPantallaClienteDetalle(){
 
 }
 
-function cerrarPantallaClienteDetalle(){
+function ocultarPantallaDetalle(id){
 
     const app = document.getElementById("appPrincipal");
 
-    const pantalla = document.getElementById("pantallaClienteDetalle");
-
-    if(app && app.classList.contains("oculto")){
-
-        app.classList.remove("oculto");
-
-    }
+    const pantalla = document.getElementById(id);
 
     if(pantalla) pantalla.classList.add("oculto");
+
+    if(app && usuarioActual) app.classList.remove("oculto");
+
+}
+
+function abrirPantallaClienteDetalle(){ mostrarPantallaDetalle("pantallaClienteDetalle"); }
+
+function cerrarPantallaClienteDetalle(){
+
+    ocultarPantallaDetalle("pantallaClienteDetalle");
+
+    if(paginaActual === "Clientes") actualizarTablaClientes();
+
+}
+
+function abrirPantallaProveedorDetalle(){ mostrarPantallaDetalle("pantallaProveedorDetalle"); }
+
+function cerrarPantallaProveedorDetalle(){
+
+    ocultarPantallaDetalle("pantallaProveedorDetalle");
+
+    if(paginaActual === "Proveedores") actualizarTablaProveedores();
+
+}
+
+function abrirPantallaAnotacionDetalle(){ mostrarPantallaDetalle("pantallaAnotacionDetalle"); }
+
+function cerrarPantallaAnotacionDetalle(){
+
+    ocultarPantallaDetalle("pantallaAnotacionDetalle");
+
+    if(paginaActual === "Anotaciones") actualizarTablaAnotaciones();
 
 }
 
@@ -576,34 +909,6 @@ function abrirPantallaPreciosCliente(){
 
 }
 
-function abrirPantallaProveedorDetalle(){
-
-    const app = document.getElementById("appPrincipal");
-
-    const pantalla = document.getElementById("pantallaProveedorDetalle");
-
-    if(app) app.classList.add("oculto");
-
-    if(pantalla) pantalla.classList.remove("oculto");
-
-}
-
-function cerrarPantallaProveedorDetalle(){
-
-    const app = document.getElementById("appPrincipal");
-
-    const pantalla = document.getElementById("pantallaProveedorDetalle");
-
-    if(app && app.classList.contains("oculto")){
-
-        app.classList.remove("oculto");
-
-    }
-
-    if(pantalla) pantalla.classList.add("oculto");
-
-}
-
 function cerrarPantallaPreciosCliente(){
 
     const detalle = document.getElementById("pantallaClienteDetalle");
@@ -611,34 +916,6 @@ function cerrarPantallaPreciosCliente(){
     const pantalla = document.getElementById("pantallaPreciosCliente");
 
     if(detalle) detalle.classList.remove("oculto");
-
-    if(pantalla) pantalla.classList.add("oculto");
-
-}
-
-function abrirPantallaAnotacionDetalle(){
-
-    const app = document.getElementById("appPrincipal");
-
-    const pantalla = document.getElementById("pantallaAnotacionDetalle");
-
-    if(app) app.classList.add("oculto");
-
-    if(pantalla) pantalla.classList.remove("oculto");
-
-}
-
-function cerrarPantallaAnotacionDetalle(){
-
-    const app = document.getElementById("appPrincipal");
-
-    const pantalla = document.getElementById("pantallaAnotacionDetalle");
-
-    if(app && app.classList.contains("oculto")){
-
-        app.classList.remove("oculto");
-
-    }
 
     if(pantalla) pantalla.classList.add("oculto");
 

@@ -1,24 +1,58 @@
 /* ==========================================
-   CONEXIÓN CON FIREBASE (FIRESTORE)
+   CONEXIÓN CON FIREBASE (FIRESTORE + CUENTAS)
    ------------------------------------------
-   Este archivo es un módulo ES (type="module")
-   y se carga DESPUÉS de todos los scripts clásicos
-   pero ANTES del evento DOMContentLoaded, así que
-   cuando arranca app.js (iniciarApp) window.FirebaseDB
-   ya está listo para usarse.
+   Este archivo es un módulo ES (type="module").
+   Vite lo empaqueta junto con la librería de
+   Firebase, así que el programa NO depende de
+   bajar nada de internet para arrancar.
+
+   Se ejecuta antes del evento DOMContentLoaded:
+   cuando arranca app.js (iniciarApp),
+   window.FirebaseDB ya está listo para usarse.
+
+   Dónde vive cada "tabla" de la app:
+
+   - Modo clásico (instalación original):
+       forralitasDatos/{tabla}
+   - Modo cuenta (un negocio = una cuenta con
+     email y contraseña):
+       negocios/{idDeLaCuenta}/datos/{tabla}
+
+   Cada tabla es un documento con el arreglo
+   completo en el campo "datos" (las tablas muy
+   grandes se reparten en partes; ver
+   src/js/datos/sync-gestor.js).
 ========================================== */
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+import { initializeApp } from "firebase/app";
+
 import {
     getFirestore,
+    connectFirestoreEmulator,
     doc,
     setDoc,
     getDoc,
-    onSnapshot
-} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+    onSnapshot,
+    runTransaction
+} from "firebase/firestore";
 
-// Configuración del proyecto de Firebase de FORRALITAS.
-const firebaseConfig = {
+import {
+    getAuth,
+    connectAuthEmulator,
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged
+} from "firebase/auth";
+
+/* ==========================================
+   CONFIGURACIÓN DEL PROYECTO DE FIREBASE
+   Si vas a usar OTRO proyecto de Firebase
+   (por ejemplo, uno propio para vender el
+   programa), reemplazá estos datos por los
+   del proyecto nuevo.
+========================================== */
+
+const FIREBASE_CONFIG = {
     apiKey: "AIzaSyA3eDUrC8_O3Yo629frSDP4GlNt4-RUfHg",
     authDomain: "forralitas-3394f.firebaseapp.com",
     projectId: "forralitas-3394f",
@@ -27,102 +61,197 @@ const firebaseConfig = {
     appId: "1:1044717245979:web:c44ab60b923c00fdc54abe"
 };
 
-// Nombre de la colección de Firestore donde vive cada "tabla" de la app.
-// Cada tabla (productos, clientes, etc.) se guarda como UN documento
-// que contiene el arreglo completo en el campo "datos".
-const COLECCION = "forralitasDatos";
+// Colección del modo clásico (la instalación original, sin cuenta).
+const COLECCION_CLASICA = "forralitasDatos";
 
-const app = initializeApp(firebaseConfig);
+/* ==========================================
+   MODO PRUEBAS
+   Solo para las pruebas automáticas: usa el
+   emulador local de Firebase en vez de la base
+   real. Nunca se activa en el uso normal.
+========================================== */
+
+let modoEmulador = false;
+
+try{
+
+    modoEmulador = localStorage.getItem("__emulador") === "1";
+
+}catch(e){ /* nada */ }
+
+const app = initializeApp(
+    modoEmulador
+        ? { projectId: "demo-prueba", apiKey: "demo", authDomain: "demo-prueba.firebaseapp.com" }
+        : FIREBASE_CONFIG
+);
+
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-/* ==========================================
-   GUARDAR
-   Sube el arreglo/objeto completo de una tabla.
-========================================== */
-async function guardarColeccion(nombre, datos){
+if(modoEmulador){
 
-    try{
+    connectFirestoreEmulator(db, "127.0.0.1", 8080);
 
-        await setDoc(doc(db, COLECCION, nombre), {
-            datos,
-            actualizado: Date.now()
-        });
-
-        return true;
-
-    }catch(error){
-
-        console.error("[Firebase] Error al guardar '" + nombre + "':", error);
-
-        return false;
-
-    }
+    connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
 
 }
 
 /* ==========================================
-   LEER (una sola vez)
-   Devuelve:
-     - los datos guardados, si el documento existe
-     - null si el documento todavía no existe en Firebase
-     - undefined si hubo un error de conexión
+   ADAPTADOR
+   Operaciones básicas sobre los documentos de
+   UN negocio. "segmentos" es la ruta de la
+   colección: ["forralitasDatos"] o
+   ["negocios", uid, "datos"].
 ========================================== */
-async function leerColeccion(nombre){
 
-    try{
+function limpiar(datos){
 
-        const snap = await getDoc(doc(db, COLECCION, nombre));
-
-        return snap.exists() ? snap.data().datos : null;
-
-    }catch(error){
-
-        console.error("[Firebase] Error al leer '" + nombre + "':", error);
-
-        return undefined;
-
-    }
+    // Firestore no acepta valores "undefined": pasar por JSON los quita.
+    return JSON.parse(JSON.stringify(datos));
 
 }
 
-/* ==========================================
-   ESCUCHAR EN VIVO
-   Se ejecuta automáticamente cada vez que otra
-   computadora modifica esa tabla. Devuelve una
-   función para cancelar la suscripción.
-========================================== */
-function escucharColeccion(nombre, callback){
+function crearAdaptador(segmentos){
 
-    return onSnapshot(
+    const ref = (nombre) => doc(db, ...segmentos, nombre);
 
-        doc(db, COLECCION, nombre),
+    return {
 
-        (snap) =>{
+        ruta: segmentos.join("/"),
 
-            if(snap.exists()){
+        async leer(nombre){
 
-                callback(snap.data().datos);
+            const snap = await getDoc(ref(nombre));
 
-            }
+            return snap.exists() ? snap.data() : null;
 
         },
 
-        (error) =>{
+        escuchar(nombre, alCambiar, alError){
 
-            console.error("[Firebase] Error escuchando '" + nombre + "':", error);
+            return onSnapshot(
+
+                ref(nombre),
+
+                { includeMetadataChanges: true },
+
+                (snap) => alCambiar(
+                    snap.exists() ? snap.data() : null,
+                    { deCache: snap.metadata.fromCache }
+                ),
+
+                alError
+
+            );
+
+        },
+
+        escribir(nombre, datos){
+
+            return setDoc(ref(nombre), limpiar(datos));
+
+        },
+
+        transaccion(fn){
+
+            return runTransaction(db, async (t) => fn({
+
+                async leer(nombre){
+
+                    const snap = await t.get(ref(nombre));
+
+                    return snap.exists() ? snap.data() : null;
+
+                },
+
+                escribir(nombre, datos){ t.set(ref(nombre), limpiar(datos)); },
+
+                borrar(nombre){ t.delete(ref(nombre)); }
+
+            }));
 
         }
 
-    );
+    };
 
 }
 
-// Se expone en window para que lo usen los scripts clásicos (app.js, auth.js, etc.)
+function adaptadorClasico(){
+
+    return crearAdaptador([COLECCION_CLASICA]);
+
+}
+
+function adaptadorCuenta(uid){
+
+    return crearAdaptador(["negocios", uid, "datos"]);
+
+}
+
+/* ==========================================
+   CUENTA DEL NEGOCIO (Firebase Authentication)
+========================================== */
+
+let resolverSesionInicial;
+
+const sesionInicial = new Promise(r =>{ resolverSesionInicial = r; });
+
+onAuthStateChanged(auth, (usuario) =>{
+
+    resolverSesionInicial(usuario);
+
+}, () => resolverSesionInicial(null));
+
+function datosCuenta(u){
+
+    return u ? { uid: u.uid, email: u.email } : null;
+
+}
+
+const cuenta = {
+
+    // Espera a saber si en esta PC ya había una cuenta ingresada.
+    async esperarInicial(msMaximo = 6000){
+
+        const u = await Promise.race([
+            sesionInicial,
+            new Promise(r => setTimeout(() => r(auth.currentUser), msMaximo))
+        ]);
+
+        return datosCuenta(u);
+
+    },
+
+    actual(){
+
+        return datosCuenta(auth.currentUser);
+
+    },
+
+    async ingresar(email, clave){
+
+        const cred = await signInWithEmailAndPassword(auth, email, clave);
+
+        return datosCuenta(cred.user);
+
+    },
+
+    salir(){
+
+        return signOut(auth);
+
+    }
+
+};
+
+// Se expone en window para que lo usen los scripts clásicos (app.js, etc.)
 window.FirebaseDB = {
-    guardarColeccion,
-    leerColeccion,
-    escucharColeccion,
+    adaptadorClasico,
+    adaptadorCuenta,
+    cuenta,
+    modoEmulador,
+    proyecto: app.options.projectId,
     listo: true
 };
 
-console.log("[Firebase] Conectado al proyecto:", firebaseConfig.projectId);
+console.log("[Firebase] Listo. Proyecto:", app.options.projectId, modoEmulador ? "(EMULADOR DE PRUEBAS)" : "");

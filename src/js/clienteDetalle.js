@@ -2,23 +2,142 @@
    DETALLE DE CLIENTE
 ========================================== */
 
+/* Los pagos cargados con versiones anteriores no tenían
+   identificador: se les asigna uno (siempre el mismo para el mismo
+   pago) para poder editarlos o eliminarlos. */
+function asegurarIdsPagos(lista, prefijo){
+
+    let cambios = false;
+
+    (lista || []).forEach((p, i) =>{
+
+        if(!p.id){
+
+            p.id = prefijo + (Date.parse(p.fecha) || 0) + "x" + i;
+
+            cambios = true;
+
+        }
+
+    });
+
+    return cambios;
+
+}
+
+/* Parte del saldo que no corresponde a ninguna venta fiada
+   (por ejemplo una deuda anterior cargada a mano). */
+function saldoGeneralCliente(cliente){
+
+    const porVentas = historialVentas
+        .filter(v => v.cliente && v.cliente.id === cliente.id)
+        .reduce((acc, v) => acc + pendienteVenta(v), 0);
+
+    return Math.max(0, redondear(Number(cliente.saldo || 0) - porVentas, 2));
+
+}
+
+function ventasDeClienteFiltradas(clienteId){
+
+    const desde = document.getElementById("fechaDesdeCliente")?.value || null;
+
+    const hasta = document.getElementById("fechaHastaCliente")?.value || null;
+
+    return historialVentas
+        .filter(v =>{
+
+            if(!v.cliente || v.cliente.id !== clienteId) return false;
+
+            if(desde || hasta){
+
+                const f = fechaLocalISO(v.fecha);
+
+                if(desde && f < desde) return false;
+
+                if(hasta && f > hasta) return false;
+
+            }
+
+            return true;
+
+        })
+        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+}
+
+function htmlVentasCliente(ventas, textoVacio){
+
+    if(ventas.length === 0){
+
+        return `
+            <div class="cardVentaHistorial">
+                <p class="tablaVacia">${textoVacio}</p>
+            </div>
+        `;
+
+    }
+
+    return ventas.map(venta =>{
+
+        const vendedor = venta.vendedor ? venta.vendedor.nombre : "—";
+
+        return `
+            <div class="cardVentaHistorial">
+                <div class="cabeceraVentaHistorial">
+                    <div>
+                        <span class="fechaVenta">🗓️ ${esc(venta.fechaTexto)}${venta.numero !== undefined ? " · N.º " + esc(venta.numero) : ""}</span>
+                        <span class="vendedorVenta">👤 ${esc(vendedor)}</span>
+                    </div>
+                    <span class="accionesVenta">${botonesVenta(venta)}</span>
+                </div>
+                <div class="datosVentaHistorial">
+                    <span><strong>Pago:</strong> ${textoMetodoPago(venta)}</span>
+                </div>
+                <table class="tablaVentaHistorial">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Cantidad</th>
+                            <th>Unidad</th>
+                            <th>Precio Unit.</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filasProductosVenta(venta)}</tbody>
+                </table>
+                <div class="totalVentaHistorial">
+                    TOTAL: ${dinero(venta.total)}
+                </div>
+            </div>
+        `;
+
+    }).join("");
+
+}
+
 function renderClienteDetalle(id){
 
     const cliente = clientes.find(c => c.id === id);
 
     if(!cliente){
 
+        document.getElementById("tituloClienteDetalle").textContent = "Cliente";
+
         document.getElementById("contenidoClienteDetalle").innerHTML = `
-
             <div class="card">
-                <p>Cliente no encontrado.</p>
+                <p>Cliente no encontrado (puede que lo hayan eliminado).</p>
             </div>
-
         `;
 
         return;
 
     }
+
+    if(asegurarIdsPagos(cliente.pagos, "PG")) guardarDatos("clientes");
+
+    // Se conservan las fechas del filtro si la pantalla se vuelve a dibujar.
+    const desdePrevio = document.getElementById("fechaDesdeCliente")?.value || "";
+    const hastaPrevio = document.getElementById("fechaHastaCliente")?.value || "";
 
     document.getElementById("tituloClienteDetalle").textContent = cliente.nombre;
 
@@ -26,72 +145,9 @@ function renderClienteDetalle(id){
         ? "saldoDeuda"
         : "saldoOK";
 
-    const ventasCliente = historialVentas.filter(v =>
-
-        v.cliente && v.cliente.id === cliente.id
-
-    );
-
-    let filasHistorial = "";
-
-    if(ventasCliente.length === 0){
-
-        filasHistorial = `
-            <tr>
-                <td colspan="5" class="tablaVacia">
-                    Este cliente todavía no tiene ventas registradas.
-                </td>
-            </tr>
-        `;
-
-    }else{
-
-        filasHistorial = ventasCliente.map(venta =>{
-
-            const filas = venta.productos.map(item => `
-                <tr>
-                    <td>${item.nombre}</td>
-                    <td>${formatearCantidadItem(item)}</td>
-                    <td>${unidadVenta(item.modo)}</td>
-                    <td>${dinero(item.precio)}</td>
-                    <td>${dinero(item.subtotal)}</td>
-                </tr>
-            `).join("");
-
-            const vendedor = venta.vendedor ? venta.vendedor.nombre : "—";
-
-            return `
-                <div class="cardVentaHistorial">
-                    <div class="cabeceraVentaHistorial">
-                        <div>
-                            <span class="fechaVenta">🗓️ ${venta.fechaTexto}</span>
-                            <span class="vendedorVenta">👤 ${vendedor}</span>
-                        </div>
-                    </div>
-                    <div class="datosVentaHistorial">
-                        <span><strong>Pago:</strong> ${textoMetodoPago(venta)}</span>
-                    </div>
-                    <table class="tablaVentaHistorial">
-                        <thead>
-                            <tr>
-                                <th>Producto</th>
-                                <th>Cantidad</th>
-                                <th>Unidad</th>
-                                <th>Precio Unit.</th>
-                                <th>Subtotal</th>
-                            </tr>
-                        </thead>
-                        <tbody>${filas}</tbody>
-                    </table>
-                    <div class="totalVentaHistorial">
-                        TOTAL: ${dinero(venta.total)}
-                    </div>
-                </div>
-            `;
-
-        }).join("");
-
-    }
+    const totalComprado = historialVentas
+        .filter(v => v.cliente && v.cliente.id === cliente.id)
+        .reduce((acc, v) => acc + Number(v.total || 0), 0);
 
     document.getElementById("contenidoClienteDetalle").innerHTML = `
 
@@ -105,17 +161,17 @@ function renderClienteDetalle(id){
 
                     <div class="datoCliente">
                         <span class="labelDato">Nombre</span>
-                        <span class="valorDato">${cliente.nombre}</span>
+                        <span class="valorDato">${esc(cliente.nombre)}</span>
                     </div>
 
                     <div class="datoCliente">
                         <span class="labelDato">Dirección</span>
-                        <span class="valorDato">${cliente.direccion || "—"}</span>
+                        <span class="valorDato">${esc(cliente.direccion || "—")}</span>
                     </div>
 
                     <div class="datoCliente">
                         <span class="labelDato">Teléfono</span>
-                        <span class="valorDato">${cliente.telefono || "—"}</span>
+                        <span class="valorDato">${esc(cliente.telefono || "—")}</span>
                     </div>
 
                     <div class="datoCliente">
@@ -123,26 +179,27 @@ function renderClienteDetalle(id){
                         <span class="valorDato ${saldoClass}">${dinero(cliente.saldo || 0)}</span>
                     </div>
 
+                    <div class="datoCliente">
+                        <span class="labelDato">Total comprado</span>
+                        <span class="valorDato">${dinero(totalComprado)}</span>
+                    </div>
+
                     ${cliente.observaciones ? `
                         <div class="datoCliente">
                             <span class="labelDato">Observaciones</span>
-                            <span class="valorDato">${cliente.observaciones}</span>
+                            <span class="valorDato">${esc(cliente.observaciones)}</span>
                         </div>
                     ` : ""}
 
                     <div class="accionesDetalleCliente">
 
-                        <button
-                            id="btnPreciosCliente"
-                            class="btnPrecios">
-                            💲 Precios
-                        </button>
+                        <button id="btnPreciosCliente" class="btnPrecios">💲 Precios</button>
 
-                        <button
-                            id="btnPagarCliente"
-                            class="btnRegistrarPago">
-                            💵 Registrar pago
-                        </button>
+                        <button id="btnPagarCliente" class="btnRegistrarPago">💵 Registrar pago</button>
+
+                        <button id="btnEstadoCuentaCliente" class="btnPrecios">🖨️ Estado de cuenta</button>
+
+                        ${puede("editarClientes") ? `<button id="btnEditarClienteDetalle" class="btnPrecios">✏️ Editar datos</button>` : ""}
 
                     </div>
 
@@ -161,39 +218,32 @@ function renderClienteDetalle(id){
             <div class="card historialClienteCard">
 
                 <h2>Historial de ventas del cliente</h2>
+
                 <div class="historialClienteBuscador">
 
                     <div class="grupoInput">
                         <label>Desde</label>
-                        <input type="date" id="fechaDesdeCliente">
+                        <input type="date" id="fechaDesdeCliente" value="${esc(desdePrevio)}">
                     </div>
 
                     <div class="grupoInput">
                         <label>Hasta</label>
-                        <input type="date" id="fechaHastaCliente">
+                        <input type="date" id="fechaHastaCliente" value="${esc(hastaPrevio)}">
                     </div>
 
-                    <button class="btnBuscarHistorial" id="btnBuscarHistorialCliente">
-                        Buscar
-                    </button>
+                    <button class="btnBuscarHistorial" id="btnBuscarHistorialCliente">Buscar</button>
 
-                    <button class="btnHoy" id="btnHoyHistorialCliente">
-                        Hoy
-                    </button>
+                    <button class="btnHoy" id="btnHoyHistorialCliente">Hoy</button>
 
-                    <button class="btnTodas" id="btnTodasHistorialCliente">
-                        Todas
-                    </button>
+                    <button class="btnTodas" id="btnTodasHistorialCliente">Todas</button>
 
                 </div>
 
                 <p class="notaHistorialCliente">
-                    Ventas registradas a nombre de ${cliente.nombre}.
+                    Ventas registradas a nombre de ${esc(cliente.nombre)}.
                 </p>
 
-                <div class="historialClienteLista" id="historialClienteLista">
-                    ${filasHistorial}
-                </div>
+                <div class="historialClienteLista" id="historialClienteLista"></div>
 
             </div>
 
@@ -201,43 +251,41 @@ function renderClienteDetalle(id){
 
     `;
 
-    const btnPrecios = document.getElementById("btnPreciosCliente");
+    const enlazar = (idBoton, fn) =>{
 
-    if(btnPrecios) btnPrecios.onclick = ()=> abrirPantallaPreciosClienteDetalle(cliente.id);
+        const el = document.getElementById(idBoton);
 
-    const btnPagar = document.getElementById("btnPagarCliente");
+        if(el) el.onclick = fn;
 
-    if(btnPagar) btnPagar.onclick = ()=> abrirModalPagoCliente(cliente.id);
+    };
 
-    const btnBuscar = document.getElementById("btnBuscarHistorialCliente");
+    enlazar("btnPreciosCliente", ()=> abrirPantallaPreciosClienteDetalle(cliente.id));
+    enlazar("btnPagarCliente", ()=> abrirModalPagoCliente(cliente.id));
+    enlazar("btnEstadoCuentaCliente", ()=> imprimirEstadoCuentaCliente(cliente.id));
+    enlazar("btnEditarClienteDetalle", ()=> editarCliente(cliente.id));
+    enlazar("btnBuscarHistorialCliente", ()=> filtrarHistorialCliente(cliente.id));
 
-    if(btnBuscar) btnBuscar.onclick = ()=> filtrarHistorialCliente(cliente.id);
-
-    const btnHoy = document.getElementById("btnHoyHistorialCliente");
-
-    if(btnHoy) btnHoy.onclick = ()=>{
+    enlazar("btnHoyHistorialCliente", ()=>{
 
         const hoy = fechaLocalISO(new Date());
 
         document.getElementById("fechaDesdeCliente").value = hoy;
-
         document.getElementById("fechaHastaCliente").value = hoy;
 
         filtrarHistorialCliente(cliente.id);
 
-    };
+    });
 
-    const btnTodas = document.getElementById("btnTodasHistorialCliente");
-
-    if(btnTodas) btnTodas.onclick = ()=>{
+    enlazar("btnTodasHistorialCliente", ()=>{
 
         document.getElementById("fechaDesdeCliente").value = "";
-
         document.getElementById("fechaHastaCliente").value = "";
 
         filtrarHistorialCliente(cliente.id);
 
-    };
+    });
+
+    filtrarHistorialCliente(cliente.id);
 
 }
 
@@ -247,100 +295,40 @@ function renderClienteDetalle(id){
 
 function filtrarHistorialCliente(clienteId){
 
-    const desde = document.getElementById("fechaDesdeCliente")?.value || null;
-
-    const hasta = document.getElementById("fechaHastaCliente")?.value || null;
-
     const cont = document.getElementById("historialClienteLista");
 
     if(!cont) return;
 
-    let ventasCliente = historialVentas.filter(v =>
+    const hayFiltro = !!(document.getElementById("fechaDesdeCliente")?.value
+        || document.getElementById("fechaHastaCliente")?.value);
 
-        v.cliente && v.cliente.id === clienteId
-
+    cont.innerHTML = htmlVentasCliente(
+        ventasDeClienteFiltradas(clienteId),
+        hayFiltro
+            ? "No hay ventas en este período."
+            : "Este cliente todavía no tiene ventas registradas."
     );
-
-    if(desde || hasta){
-
-        ventasCliente = ventasCliente.filter(v =>{
-
-            const f = fechaLocalISO(v.fecha);
-
-            if(desde && f < desde) return false;
-
-            if(hasta && f > hasta) return false;
-
-            return true;
-
-        });
-
-    }
-
-    if(ventasCliente.length === 0){
-
-        cont.innerHTML = `
-            <div class="cardVentaHistorial">
-                <p class="tablaVacia">
-                    No hay ventas en este período.
-                </p>
-            </div>
-        `;
-
-        return;
-
-    }
-
-    cont.innerHTML = ventasCliente.map(venta =>{
-
-        const filas = venta.productos.map(item => `
-            <tr>
-                <td>${item.nombre}</td>
-                <td>${formatearCantidadItem(item)}</td>
-                <td>${unidadVenta(item.modo)}</td>
-                <td>${dinero(item.precio)}</td>
-                <td>${dinero(item.subtotal)}</td>
-            </tr>
-        `).join("");
-
-        const vendedor = venta.vendedor ? venta.vendedor.nombre : "—";
-
-        return `
-            <div class="cardVentaHistorial">
-                <div class="cabeceraVentaHistorial">
-                    <div>
-                        <span class="fechaVenta">🗓️ ${venta.fechaTexto}</span>
-                        <span class="vendedorVenta">👤 ${vendedor}</span>
-                    </div>
-                </div>
-                <div class="datosVentaHistorial">
-                    <span><strong>Pago:</strong> ${textoMetodoPago(venta)}</span>
-                </div>
-                <table class="tablaVentaHistorial">
-                    <thead>
-                        <tr>
-                            <th>Producto</th>
-                            <th>Cantidad</th>
-                            <th>Unidad</th>
-                            <th>Precio Unit.</th>
-                            <th>Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>${filas}</tbody>
-                </table>
-                <div class="totalVentaHistorial">
-                    TOTAL: ${dinero(venta.total)}
-                </div>
-            </div>
-        `;
-
-    }).join("");
 
 }
 
 /* ==========================================
    HISTORIAL DE PAGOS DEL CLIENTE
 ========================================== */
+
+function textoMetodoPagoSimple(pago){
+
+    if(pago.tipoPago === "transferencia") return "Transferencia";
+
+    if(pago.tipoPago === "mixto"){
+
+        return "Mixto (E: " + dinero((pago.pago && pago.pago.efectivo) || 0)
+            + " · T: " + dinero((pago.pago && pago.pago.transferencia) || 0) + ")";
+
+    }
+
+    return "Efectivo";
+
+}
 
 function renderHistorialPagosCliente(cliente){
 
@@ -358,12 +346,23 @@ function renderHistorialPagosCliente(cliente){
             <div class="filaPagoCliente">
                 <div>
                     <strong>${dinero(pago.monto)}</strong>
-                    <small>🗓️ ${pago.fechaTexto}</small>
+                    <small>🗓️ ${esc(pago.fechaTexto)} · ${esc(textoMetodoPagoSimple(pago))}</small>
                 </div>
                 <div class="detallePagoCliente">
-                    <span>Aplicado a la venta del ${pago.ventaFechaTexto || "—"}</span>
-                    <span>Le quedan ${dinero(pago.restanteVenta || 0)} de esa venta</span>
+                    ${pago.ventaId
+                        ? `<span>Aplicado a la venta del ${esc(pago.ventaFechaTexto || "—")}</span>
+                           <span>Le quedaban ${dinero(pago.restanteVenta || 0)} de esa venta</span>`
+                        : `<span>A cuenta del saldo general</span>`}
+                    ${pago.vendedor && pago.vendedor.nombre ? `<span>Cobró: ${esc(pago.vendedor.nombre)}</span>` : ""}
                 </div>
+                ${esAdmin() ? `
+                    <div class="accionesTabla">
+                        <button class="btnAccion btnEditar" title="Editar pago"
+                            onclick="editarPagoCliente('${esc(cliente.id)}', '${esc(pago.id)}')">✏️</button>
+                        <button class="btnAccion btnBorrar" title="Eliminar pago"
+                            onclick="eliminarPagoCliente('${esc(cliente.id)}', '${esc(pago.id)}')">🗑️</button>
+                    </div>
+                ` : ""}
             </div>
         `).join("");
 
@@ -382,19 +381,17 @@ function cambiarMetodoPagoCliente(tipo){
 
     metodoPagoCliente = tipo;
 
-    ["btnEfectivoPagoCliente", "btnTransferenciaPagoCliente", "btnMixtoPagoCliente"].forEach(id =>{
-
-        document.getElementById(id)?.classList.remove("activo");
-
-    });
-
     const mapaBotones = {
         efectivo: "btnEfectivoPagoCliente",
         transferencia: "btnTransferenciaPagoCliente",
         mixto: "btnMixtoPagoCliente"
     };
 
-    document.getElementById(mapaBotones[tipo])?.classList.add("activo");
+    Object.keys(mapaBotones).forEach(k =>{
+
+        document.getElementById(mapaBotones[k])?.classList.toggle("activo", k === tipo);
+
+    });
 
     const pagoMixto = document.getElementById("pagoMixtoPagoCliente");
 
@@ -412,61 +409,93 @@ function abrirModalPagoCliente(id){
 
     document.getElementById("saldoActualPago").value = dinero(cliente.saldo || 0);
 
-    document.getElementById("montoPagoCliente").value = "";
-
-    limpiar("montoEfectivoPagoCliente", "montoTransferenciaPagoCliente");
+    limpiar("montoPagoCliente", "montoEfectivoPagoCliente", "montoTransferenciaPagoCliente");
 
     cambiarMetodoPagoCliente("efectivo");
 
-    const ventasPendientes = historialVentas.filter(v =>{
+    const ventasPendientes = historialVentas
+        .filter(v => v.cliente && v.cliente.id === id && pendienteVenta(v) > 0)
+        .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 
-        if(!v.cliente || v.cliente.id !== id) return false;
-
-        if(v.metodoPago !== "debe") return false;
-
-        const pendiente = v.saldoPendiente !== undefined
-            ? Number(v.saldoPendiente)
-            : Number(v.total || 0);
-
-        return pendiente > 0.01;
-
-    }).sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    const general = saldoGeneralCliente(cliente);
 
     const lista = document.getElementById("listaVentasPendientesPago");
 
-    if(ventasPendientes.length === 0){
+    let html = ventasPendientes.map((v, i) => `
+        <label class="filaVentaPendiente">
+            <input
+                type="radio"
+                name="ventaPagoSeleccionada"
+                value="${esc(v.id)}"
+                ${i === 0 ? "checked" : ""}>
+            <span>
+                🗓️ ${esc(v.fechaTexto)} — debe <strong>${dinero(pendienteVenta(v))}</strong>
+                de ${dinero(v.total)}
+            </span>
+        </label>
+    `).join("");
 
-        lista.innerHTML = `<p class="tablaVacia">Este cliente no tiene ventas pendientes de pago.</p>`;
+    // Deuda que no viene de una venta (saldo cargado a mano).
+    if(general > 0.01){
 
-    }else{
-
-        lista.innerHTML = ventasPendientes.map((v, i) =>{
-
-            const pendiente = v.saldoPendiente !== undefined
-                ? Number(v.saldoPendiente)
-                : Number(v.total || 0);
-
-            return `
-                <label class="filaVentaPendiente">
-                    <input
-                        type="radio"
-                        name="ventaPagoSeleccionada"
-                        value="${v.id}"
-                        ${i === 0 ? "checked" : ""}>
-                    <span>
-                        🗓️ ${v.fechaTexto} — debe <strong>${dinero(pendiente)}</strong>
-                        de ${dinero(v.total)}
-                    </span>
-                </label>
-            `;
-
-        }).join("");
+        html += `
+            <label class="filaVentaPendiente">
+                <input
+                    type="radio"
+                    name="ventaPagoSeleccionada"
+                    value="__general__"
+                    ${ventasPendientes.length === 0 ? "checked" : ""}>
+                <span>
+                    Saldo general (deuda anterior, sin venta asociada) — debe
+                    <strong>${dinero(general)}</strong>
+                </span>
+            </label>
+        `;
 
     }
+
+    lista.innerHTML = html
+        || `<p class="tablaVacia">Este cliente no tiene nada pendiente de pago.</p>`;
 
     abrir("modalPagoCliente");
 
     setTimeout(()=> document.getElementById("montoPagoCliente").focus(), 100);
+
+}
+
+/* Arma el desglose efectivo/transferencia de un pago. Devuelve
+   null (y avisa) si los montos del pago mixto no cierran. */
+function armarDesglosePago(metodo, monto, idEfectivo, idTransferencia){
+
+    const pago = { efectivo: 0, transferencia: 0 };
+
+    if(metodo === "efectivo"){
+
+        pago.efectivo = monto;
+
+    }else if(metodo === "transferencia"){
+
+        pago.transferencia = monto;
+
+    }else{
+
+        pago.efectivo = numeroDe(idEfectivo);
+        pago.transferencia = numeroDe(idTransferencia);
+
+        if(Math.abs(pago.efectivo + pago.transferencia - monto) > 0.01){
+
+            notificacion(
+                "Los montos del pago mixto deben sumar " + dinero(monto) + ".",
+                "warning"
+            );
+
+            return null;
+
+        }
+
+    }
+
+    return pago;
 
 }
 
@@ -478,19 +507,21 @@ function guardarPagoCliente(){
 
     if(!cliente) return;
 
-    const ventaSeleccionada = document.querySelector('input[name="ventaPagoSeleccionada"]:checked');
+    const seleccion = document.querySelector('input[name="ventaPagoSeleccionada"]:checked');
 
-    if(!ventaSeleccionada){
+    if(!seleccion){
 
-        notificacion("Este cliente no tiene ventas pendientes para aplicar el pago.", "warning");
+        notificacion("Este cliente no tiene nada pendiente para aplicar el pago.", "warning");
 
         return;
 
     }
 
-    const venta = historialVentas.find(v => v.id === ventaSeleccionada.value);
+    const esGeneral = seleccion.value === "__general__";
 
-    if(!venta){
+    const venta = esGeneral ? null : historialVentas.find(v => v.id === seleccion.value);
+
+    if(!esGeneral && !venta){
 
         notificacion("No se encontró esa venta.", "warning");
 
@@ -498,11 +529,9 @@ function guardarPagoCliente(){
 
     }
 
-    const monto = Number(document.getElementById("montoPagoCliente").value) || 0;
+    const monto = numeroDe("montoPagoCliente");
 
-    const pendiente = venta.saldoPendiente !== undefined
-        ? Number(venta.saldoPendiente)
-        : Number(venta.total || 0);
+    const pendiente = esGeneral ? saldoGeneralCliente(cliente) : pendienteVenta(venta);
 
     if(monto <= 0){
 
@@ -515,8 +544,8 @@ function guardarPagoCliente(){
     if(monto > pendiente + 0.01){
 
         notificacion(
-            "Ese pago (" + dinero(monto) + ") es mayor a lo que debe esa venta (" + dinero(pendiente) + "). "
-            + "Elegí otra venta o cargá un monto menor.",
+            "Ese pago (" + dinero(monto) + ") es mayor a lo que debe ahí (" + dinero(pendiente) + "). "
+            + "Elegí otra opción o cargá un monto menor.",
             "warning"
         );
 
@@ -525,66 +554,46 @@ function guardarPagoCliente(){
     }
 
     // Desglose efectivo/transferencia, igual que en ventas y gastos,
-    // para que esta plata se sume después en la Caja (Reportes).
-    let pago = { efectivo: 0, transferencia: 0 };
+    // para que esta plata se sume después en la Caja.
+    const pago = armarDesglosePago(metodoPagoCliente, monto, "montoEfectivoPagoCliente", "montoTransferenciaPagoCliente");
 
-    if(metodoPagoCliente === "efectivo"){
+    if(!pago) return;
 
-        pago.efectivo = monto;
+    const restante = redondear(Math.max(0, pendiente - monto), 2);
 
-    }else if(metodoPagoCliente === "transferencia"){
+    if(venta){
 
-        pago.transferencia = monto;
-
-    }else{
-
-        pago.efectivo = Number(document.getElementById("montoEfectivoPagoCliente").value) || 0;
-        pago.transferencia = Number(document.getElementById("montoTransferenciaPagoCliente").value) || 0;
-
-        const suma = pago.efectivo + pago.transferencia;
-
-        if(Math.abs(suma - monto) > 0.01){
-
-            notificacion(
-                "Los montos del pago mixto deben sumar " + dinero(monto) + ".",
-                "warning"
-            );
-
-            return;
-
-        }
+        venta.saldoPendiente = restante;
+        venta.pagada = restante <= 0.01;
 
     }
 
-    const restante = Math.max(0, pendiente - monto);
-
-    venta.saldoPendiente = restante;
-    venta.pagada = restante <= 0.01;
-
-    cliente.saldo = Math.max(0, Number(cliente.saldo || 0) - monto);
+    cliente.saldo = redondear(Math.max(0, Number(cliente.saldo || 0) - monto), 2);
 
     if(!cliente.pagos) cliente.pagos = [];
 
+    const ahora = new Date();
+
     cliente.pagos.push({
 
-        fecha: new Date().toISOString(),
-        fechaTexto: fechaHoraTexto(new Date()),
+        id: nuevoId("PG"),
+        fecha: ahora.toISOString(),
+        fechaTexto: fechaHoraTexto(ahora),
         monto,
         tipoPago: metodoPagoCliente,
         pago,
-        ventaId: venta.id,
-        ventaFechaTexto: venta.fechaTexto,
+        ventaId: venta ? venta.id : null,
+        ventaFechaTexto: venta ? venta.fechaTexto : null,
         restanteVenta: restante,
 
-        // Para que la Caja separe esta plata por empleado, igual que
-        // ventas y gastos.
+        // Para que la Caja separe esta plata por empleado.
         vendedor: usuarioActual
             ? { usuario: usuarioActual.usuario, nombre: usuarioActual.nombre }
             : null
 
     });
 
-    guardarDatos();
+    guardarDatos("clientes", "historialVentas");
 
     cerrarModalPagoCliente();
 
@@ -593,9 +602,277 @@ function guardarPagoCliente(){
     clientePagoActualId = null;
 
     notificacion(
-        restante <= 0.01
+        venta && restante <= 0.01
             ? "¡Venta saldada! Quedó marcada como pagada."
-            : "Pago registrado. Quedan " + dinero(restante) + " de esa venta."
+            : "Pago registrado. Quedan " + dinero(restante) + (venta ? " de esa venta." : " del saldo general.")
     );
+
+}
+
+/* ==========================================
+   EDITAR / ELIMINAR UN PAGO (SOLO ADMIN)
+   El mismo modal sirve para pagos de clientes
+   y pagos a proveedores.
+========================================== */
+
+let pagoEditando = null;
+
+function abrirModalEditarPago(contexto, pago, conMetodo){
+
+    pagoEditando = contexto;
+
+    document.getElementById("montoEditarPago").value = pago.monto || "";
+    document.getElementById("fechaEditarPago").value = fechaParaInputLocal(pago.fecha);
+
+    document.getElementById("grupoMetodoEditarPago").classList.toggle("oculto", !conMetodo);
+
+    const metodo = document.getElementById("metodoEditarPago");
+
+    metodo.value = pago.tipoPago || "efectivo";
+
+    document.getElementById("efectivoEditarPago").value = (pago.pago && pago.pago.efectivo) || "";
+    document.getElementById("transferenciaEditarPago").value = (pago.pago && pago.pago.transferencia) || "";
+
+    const alternar = () => document.getElementById("mixtoEditarPago")
+        .classList.toggle("oculto", !conMetodo || metodo.value !== "mixto");
+
+    metodo.onchange = alternar;
+
+    alternar();
+
+    abrir("modalEditarPago");
+
+}
+
+function editarPagoCliente(clienteId, pagoId){
+
+    if(!soloAdmin()) return;
+
+    const cliente = clientes.find(c => c.id === clienteId);
+
+    const pago = cliente ? (cliente.pagos || []).find(p => p.id === pagoId) : null;
+
+    if(!pago) return;
+
+    abrirModalEditarPago({ tipo: "cliente", duenoId: clienteId, pagoId }, pago, true);
+
+}
+
+function guardarPagoEditado(){
+
+    if(!soloAdmin() || !pagoEditando) return;
+
+    const monto = numeroDe("montoEditarPago");
+
+    if(monto <= 0){
+
+        notificacion("Ingresá un monto válido.", "warning");
+
+        return;
+
+    }
+
+    const fechaValor = document.getElementById("fechaEditarPago").value;
+
+    const fecha = fechaValor ? new Date(fechaValor) : null;
+
+    if(fecha && isNaN(fecha.getTime())){
+
+        notificacion("La fecha no es válida.", "warning");
+
+        return;
+
+    }
+
+    const ok = pagoEditando.tipo === "cliente"
+        ? aplicarEdicionPagoCliente(monto, fecha)
+        : aplicarEdicionPagoProveedor(monto, fecha);
+
+    if(!ok) return;
+
+    cerrar("modalEditarPago");
+
+    pagoEditando = null;
+
+    notificacion("Pago actualizado.");
+
+}
+
+function aplicarEdicionPagoCliente(monto, fecha){
+
+    const cliente = clientes.find(c => c.id === pagoEditando.duenoId);
+
+    const pago = cliente ? (cliente.pagos || []).find(p => p.id === pagoEditando.pagoId) : null;
+
+    if(!pago) return false;
+
+    const metodo = document.getElementById("metodoEditarPago").value;
+
+    const desglose = armarDesglosePago(metodo, monto, "efectivoEditarPago", "transferenciaEditarPago");
+
+    if(!desglose) return false;
+
+    const diferencia = redondear(monto - Number(pago.monto || 0), 2);
+
+    const venta = pago.ventaId ? historialVentas.find(v => v.id === pago.ventaId) : null;
+
+    const disponible = venta && venta.metodoPago === "debe"
+        ? pendienteVenta(venta)
+        : (pago.ventaId ? Number(cliente.saldo || 0) : saldoGeneralCliente(cliente));
+
+    if(diferencia > disponible + 0.01){
+
+        notificacion(
+            "El pago no puede superar lo que se debía: como máximo "
+            + dinero(Number(pago.monto || 0) + disponible) + ".",
+            "warning"
+        );
+
+        return false;
+
+    }
+
+    if(venta && venta.metodoPago === "debe"){
+
+        venta.saldoPendiente = redondear(Math.max(0, pendienteVenta(venta) - diferencia), 2);
+        venta.pagada = venta.saldoPendiente <= 0.01;
+
+        pago.restanteVenta = venta.saldoPendiente;
+
+    }
+
+    cliente.saldo = redondear(Math.max(0, Number(cliente.saldo || 0) - diferencia), 2);
+
+    pago.monto = monto;
+    pago.tipoPago = metodo;
+    pago.pago = desglose;
+
+    if(fecha){
+
+        pago.fecha = fecha.toISOString();
+        pago.fechaTexto = fechaHoraTexto(fecha);
+
+    }
+
+    guardarDatos("clientes", "historialVentas");
+
+    renderClienteDetalle(cliente.id);
+
+    return true;
+
+}
+
+function eliminarPagoCliente(clienteId, pagoId){
+
+    if(!soloAdmin()) return;
+
+    const cliente = clientes.find(c => c.id === clienteId);
+
+    const pago = cliente ? (cliente.pagos || []).find(p => p.id === pagoId) : null;
+
+    if(!pago) return;
+
+    confirmar(
+        "¿Eliminar el pago de " + dinero(pago.monto) + " del " + pago.fechaTexto
+        + "? Esa plata vuelve a figurar como deuda del cliente.",
+        ()=>{
+
+            const venta = pago.ventaId ? historialVentas.find(v => v.id === pago.ventaId) : null;
+
+            if(venta && venta.metodoPago === "debe"){
+
+                venta.saldoPendiente = redondear(
+                    Math.min(Number(venta.total || 0), pendienteVenta(venta) + Number(pago.monto || 0)),
+                    2
+                );
+
+                venta.pagada = venta.saldoPendiente <= 0.01;
+
+            }
+
+            cliente.saldo = redondear(Number(cliente.saldo || 0) + Number(pago.monto || 0), 2);
+
+            cliente.pagos = cliente.pagos.filter(p => p.id !== pagoId);
+
+            registrarEliminacion(
+                "Pago de cliente",
+                "Pago de " + cliente.nombre + " · " + dinero(pago.monto) + " · " + pago.fechaTexto,
+                pago
+            );
+
+            guardarDatos("clientes", "historialVentas", "eliminaciones");
+
+            renderClienteDetalle(cliente.id);
+
+            notificacion("Pago eliminado.", "error");
+
+        }
+    );
+
+}
+
+/* ==========================================
+   ESTADO DE CUENTA IMPRIMIBLE
+========================================== */
+
+function imprimirEstadoCuentaCliente(clienteId){
+
+    const cliente = clientes.find(c => c.id === clienteId);
+
+    if(!cliente) return;
+
+    const n = configuracionSistema.negocio || {};
+
+    const pendientes = historialVentas
+        .filter(v => v.cliente && v.cliente.id === clienteId && pendienteVenta(v) > 0)
+        .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+    const general = saldoGeneralCliente(cliente);
+
+    const filasVentas = pendientes.map(v => `
+        <tr>
+            <td>${esc(v.fechaTexto)}</td>
+            <td>${(v.productos || []).map(i => esc(formatearCantidadItem(i) + " " + unidadVenta(i.modo).toLowerCase() + " " + i.nombre)).join("<br>")}</td>
+            <td class="derecha">${dinero(v.total)}</td>
+            <td class="derecha"><strong>${dinero(pendienteVenta(v))}</strong></td>
+        </tr>
+    `).join("");
+
+    const pagos = [...(cliente.pagos || [])]
+        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+        .slice(0, 15);
+
+    const filasPagos = pagos.map(p => `
+        <tr>
+            <td>${esc(p.fechaTexto)}</td>
+            <td>${esc(textoMetodoPagoSimple(p))}</td>
+            <td class="derecha">${dinero(p.monto)}</td>
+        </tr>
+    `).join("");
+
+    imprimirHtml(`
+        <div class="hojaImpresion">
+            <h1>${esc(n.nombre || "")}</h1>
+            <p>${[n.direccion, n.telefono].filter(Boolean).map(esc).join(" · ")}</p>
+            <h2>Estado de cuenta — ${esc(cliente.nombre)}</h2>
+            <p>Fecha: ${esc(fechaHoraTexto(new Date()))}</p>
+            <h3>Ventas pendientes de pago</h3>
+            ${pendientes.length ? `
+                <table>
+                    <thead><tr><th>Fecha</th><th>Detalle</th><th class="derecha">Total</th><th class="derecha">Debe</th></tr></thead>
+                    <tbody>${filasVentas}</tbody>
+                </table>
+            ` : "<p>No tiene ventas pendientes.</p>"}
+            ${general > 0.01 ? `<p>Saldo anterior (sin venta asociada): <strong>${dinero(general)}</strong></p>` : ""}
+            <p class="totalHoja">SALDO TOTAL: ${dinero(cliente.saldo || 0)}</p>
+            ${pagos.length ? `
+                <h3>Últimos pagos</h3>
+                <table>
+                    <thead><tr><th>Fecha</th><th>Forma de pago</th><th class="derecha">Monto</th></tr></thead>
+                    <tbody>${filasPagos}</tbody>
+                </table>
+            ` : ""}
+        </div>
+    `, "impresionHoja");
 
 }

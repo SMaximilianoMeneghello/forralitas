@@ -6,41 +6,9 @@ let clientePreciosActualId = null;
 
 let productoPrecioEditandoId = null;
 
-// Caché en memoria de los precios personalizados por cliente, sincronizada
-// con Firebase. Arranca con lo que había en localStorage como respaldo.
-let preciosClientesCache = JSON.parse(localStorage.getItem("preciosClientes")) || [];
-
-async function inicializarPreciosClientesFirebase(){
-
-    if(!window.FirebaseDB) return;
-
-    const remoto = await window.FirebaseDB.leerColeccion("preciosClientes");
-
-    if(remoto === undefined) return; // sin conexión: seguimos con lo local
-
-    if(remoto === null){
-
-        window.FirebaseDB.guardarColeccion("preciosClientes", preciosClientesCache);
-
-    }else{
-
-        preciosClientesCache = remoto;
-
-        localStorage.setItem("preciosClientes", JSON.stringify(remoto));
-
-    }
-
-    window.FirebaseDB.escucharColeccion("preciosClientes", (remoto) =>{
-
-        preciosClientesCache = remoto;
-
-        localStorage.setItem("preciosClientes", JSON.stringify(remoto));
-
-        refrescarPantallaActual();
-
-    });
-
-}
+// Precios personalizados por cliente (se sincronizan como una tabla
+// más: ver ENTIDADES_SINCRONIZADAS en app.js).
+let preciosClientesCache = [];
 
 function obtenerTodosPreciosCliente(){
 
@@ -52,9 +20,7 @@ function guardarTodosPreciosCliente(lista){
 
     preciosClientesCache = lista;
 
-    localStorage.setItem("preciosClientes", JSON.stringify(lista));
-
-    if(window.FirebaseDB) window.FirebaseDB.guardarColeccion("preciosClientes", lista);
+    guardarDatos("preciosClientes");
 
 }
 
@@ -159,7 +125,7 @@ function renderPantallaPreciosCliente(){
 
             const producto = productos.find(p=>
 
-                p.nombre.toLowerCase().includes(texto)
+                (p.nombre || "").toLowerCase().includes(texto)
 
                 || (p.id || "").toLowerCase().includes(texto)
 
@@ -214,7 +180,7 @@ function buscarProductoPrecio(){
 
         return (
 
-            producto.nombre.toLowerCase().includes(texto)
+            (producto.nombre || "").toLowerCase().includes(texto)
 
             || (producto.id || "").toLowerCase().includes(texto)
 
@@ -240,17 +206,15 @@ function buscarProductoPrecio(){
 
             <div
                 class="itemBusquedaProducto"
-                onclick="seleccionarProductoPrecio('${producto.id}')">
+                onclick="seleccionarProductoPrecio('${esc(producto.id)}')">
 
-                <strong>${producto.nombre}</strong>
+                <strong>${esc(producto.nombre)}</strong>
 
                 <br>
 
                 <small>
 
-                    ${producto.id}
-
-                    • Bolsa: ${dinero(producto.precioBolsa)}
+                    Bolsa: ${dinero(producto.precioBolsa)}
 
                     • Kg: ${dinero(producto.precioKg)}
                 </small>
@@ -282,11 +246,11 @@ function seleccionarProductoPrecio(id){
 
     document.getElementById("precioBolsaCliente").value =
 
-        existente ? existente.precioBolsa : producto.precioBolsa;
+        existente ? (existente.precioBolsa || "") : (producto.precioBolsa || "");
 
     document.getElementById("precioKgCliente").value =
 
-        existente ? existente.precioKg : producto.precioKg;
+        existente ? (existente.precioKg || "") : (producto.precioKg || "");
 
     abrir("modalPrecioCliente");
 
@@ -299,6 +263,8 @@ function seleccionarProductoPrecio(id){
 ========================================== */
 
 function guardarPrecioCliente(){
+
+    if(!puede("editarClientes")){ avisarSinPermiso(); return; }
 
     if(!clientePreciosActualId || !productoPrecioEditandoId){
 
@@ -340,7 +306,7 @@ function guardarPrecioCliente(){
 
         lista.push({
 
-            id: "PC" + Date.now(),
+            id: nuevoId("PC"),
 
             clienteId: clientePreciosActualId,
 
@@ -420,8 +386,7 @@ function renderListaPreciosRegistrados(){
         return `
             <div class="itemPrecioRegistrado">
                 <div class="datoPrecioRegistrado">
-                    <strong>${nombre}</strong>
-                    <small>${p.productoId}</small>
+                    <strong>${esc(nombre)}</strong>
                 </div>
                 <div class="valoresPrecioRegistrado">
                     <span>Bolsa: ${dinero(p.precioBolsa)}</span>
@@ -431,13 +396,13 @@ function renderListaPreciosRegistrados(){
                     <button
                         class="btnAccion btnEditar"
                         title="Editar precio"
-                        onclick="editarPrecioRegistrado('${p.productoId}')">
+                        onclick="editarPrecioRegistrado('${esc(p.productoId)}')">
                         ✏️
                     </button>
                     <button
                         class="btnAccion btnBorrar"
                         title="Eliminar precio"
-                        onclick="eliminarPrecioRegistrado('${p.productoId}')">
+                        onclick="eliminarPrecioRegistrado('${esc(p.productoId)}')">
                         🗑️
                     </button>
                 </div>
@@ -455,6 +420,8 @@ function editarPrecioRegistrado(productoId){
 }
 
 function eliminarPrecioRegistrado(productoId){
+
+    if(!puede("editarClientes")){ avisarSinPermiso(); return; }
 
     const producto = productos.find(p => p.id === productoId);
 
