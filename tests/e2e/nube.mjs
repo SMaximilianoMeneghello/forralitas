@@ -106,7 +106,7 @@ afirmar(await estado(A.pagina, "historialVentas.length === 1 && productos.length
 afirmar(await estado(A.pagina, "document.querySelector('.sidebar .logo').textContent === 'FORRALITAS'"), "el negocio se sigue llamando FORRALITAS");
 let u = (await nube(["forralitasDatos"], "usuarios")).datos;
 afirmar(u.find(x => x.usuario === "maxiadmin").hash && !u.find(x => x.usuario === "maxiadmin").password, "la contraseña del admin quedó cifrada en la nube");
-afirmar(u.find(x => x.usuario === "lorenaforralitas").password === "forrajeriaforralitas", "las cuentas que todavía no ingresaron siguen funcionando igual");
+afirmar(u.every(x => x.hash && !x.password), "todas las contraseñas quedaron cifradas (ninguna en texto)");
 afirmar(u.find(x => x.usuario === "maxiforralitas").ocultarEliminaciones === true, "se conserva el usuario sin registro de eliminaciones (ahora como opción visible)");
 afirmar(await estado(A.pagina, "productos.find(p => p.nombre === 'MAIZ X 40KG').separarPorBolsa === 11000 && productos.find(p => p.nombre === 'ALFA VERDE').separarPorBolsa === 5000"), "las reglas de 'separar' pasaron a los productos");
 await A.pagina.click("#Reportes");
@@ -275,6 +275,9 @@ else console.log("\nTODO OK (nube)");
 }catch(e){
     console.error("\n" + e.message);
     console.log("errores de consola:", pcs.flatMap(x => x.errores));
+    for(const [i, x] of pcs.entries()){
+        console.log("PC " + i + ":", await x.pagina.evaluate("JSON.stringify({ ventas: historialVentas.length, stock: productos.map(p => [p.nombre, p.stock]), sync: gestorSync && gestorSync.estado(), carrito })").catch(e2 => "sin estado: " + e2.message));
+    }
     process.exitCode = 1;
 }
 await nav.close();

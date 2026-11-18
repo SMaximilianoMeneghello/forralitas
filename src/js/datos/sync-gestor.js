@@ -63,6 +63,7 @@ window.crearGestorSync = function(cfg){
             errores: 0,
             enviando: false,
             errorEscucha: null,
+            confirmados: null,
             cancelarEscucha: null,
             resolverPrimera: null
         });
@@ -467,6 +468,26 @@ window.crearGestorSync = function(cfg){
 
             if(detenido) return;
 
+            // Justo después de subir un cambio propio puede llegar con
+            // demora una "foto" anterior de la tabla (por ejemplo, de un
+            // cambio de otra PC que entró un instante antes). Se saltea:
+            // enseguida llega la foto que ya incluye lo nuestro.
+            if(t.confirmados){
+
+                const lotesFoto = data && Array.isArray(data.lotes) ? data.lotes : null;
+
+                if(lotesFoto
+                    && Date.now() < t.confirmados.hasta
+                    && !t.confirmados.ids.every(id => lotesFoto.indexOf(id) >= 0)){
+
+                    return;
+
+                }
+
+                t.confirmados = null;
+
+            }
+
             const rem = await leerRemoto(t, data, n => adaptador.leer(n));
 
             t.remoto = rem;
@@ -623,6 +644,7 @@ window.crearGestorSync = function(cfg){
             t.remoto = R.remoto;
             t.errores = 0;
             t.enviando = false;
+            t.confirmados = { ids: enviados.map(l => l.id), hasta: Date.now() + 20000 };
 
             ultimoError = null;
 

@@ -910,6 +910,11 @@ function actualizarPreviewCantidad(){
 
 function confirmarCantidad(){
 
+    // Se vuelve a buscar el producto: si mientras estaba abierto el
+    // cuadro llegó un cambio de otra PC, la lista se reemplazó y hay que
+    // descontar el stock sobre el registro actual (si no, se perdía).
+    if(productoVenta) productoVenta = productos.find(p => p.id === productoVenta.id) || null;
+
     if(!productoVenta){
 
         notificacion("Seleccioná un producto.", "warning");

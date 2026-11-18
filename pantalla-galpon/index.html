@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FORRALITAS · Pantalla del galpón</title>
+<title>Pantalla del galpón</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -213,6 +213,58 @@
         animation:vaciar var(--duracion-aviso) linear forwards;
     }
 
+    /* ---------- Ingreso con la cuenta del negocio ---------- */
+
+    #panelCuenta{
+        position:fixed;
+        inset:0;
+        display:none;
+        align-items:center;
+        justify-content:center;
+        background:rgba(0,0,0,.75);
+        z-index:10;
+    }
+
+    #panelCuenta.activo{ display:flex; }
+
+    #panelCuenta form{
+        background:var(--fondo-panel);
+        border:2px solid rgba(217,164,65,.35);
+        border-radius:18px;
+        padding:32px;
+        width:min(92vw, 420px);
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+    }
+
+    #panelCuenta h2{
+        font-family:"Oswald", sans-serif;
+        font-weight:500;
+        font-size:26px;
+    }
+
+    #panelCuenta p{ color:var(--texto-tenue); font-size:15px; }
+
+    #panelCuenta input,
+    #panelCuenta button{
+        font-size:18px;
+        padding:12px 14px;
+        border-radius:10px;
+        border:1px solid rgba(255,255,255,.2);
+        background:#0c1811;
+        color:var(--texto);
+    }
+
+    #panelCuenta button{
+        background:var(--verde);
+        border:none;
+        font-weight:700;
+        cursor:pointer;
+    }
+
+    #errorCuenta{ color:#ff8a80; min-height:20px; }
+
     @keyframes vaciar{
         from{ transform:scaleX(1); }
         to{ transform:scaleX(0); }
@@ -224,7 +276,7 @@
 
     <div class="marca">
         <div class="punto"></div>
-        <span>Forralitas</span>
+        <span id="nombreNegocio">Galpón</span>
     </div>
 
     <div class="reloj" id="reloj">--:--</div>
@@ -242,6 +294,17 @@
         <div class="horaAviso" id="horaAviso"></div>
     </div>
 
+    <div id="panelCuenta">
+        <form id="formCuenta">
+            <h2>Cuenta del negocio</h2>
+            <p>Ingresá el email y la clave del negocio para que esta pantalla reciba los avisos de venta.</p>
+            <input id="emailCuenta" type="text" placeholder="Email del negocio" autocomplete="username">
+            <input id="claveCuenta" type="password" placeholder="Clave del negocio" autocomplete="current-password">
+            <button type="submit">Ingresar</button>
+            <div id="errorCuenta"></div>
+        </form>
+    </div>
+
     <div class="barraTiempo">
         <div class="relleno" id="relleno"></div>
     </div>
@@ -252,6 +315,9 @@
         import {
             getFirestore, doc, onSnapshot
         } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+        import {
+            getAuth, onAuthStateChanged, signInWithEmailAndPassword
+        } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 
         // Mismo proyecto de Firebase que usa la app de la caja.
         const firebaseConfig = {
@@ -262,6 +328,18 @@
             messagingSenderId: "1044717245979",
             appId: "1:1044717245979:web:c44ab60b923c00fdc54abe"
         };
+
+        /* ==========================================
+           ¿DE QUÉ NEGOCIO ES ESTA PANTALLA?
+           - Instalación original (sin cuenta): abrir
+             este archivo tal cual.
+           - Negocio con cuenta: abrirlo agregando
+             ?cuenta=1 al final de la dirección. La
+             primera vez pide el email y la clave del
+             negocio y después los recuerda.
+        ========================================== */
+        const USA_CUENTA = new URLSearchParams(location.search).has("cuenta")
+            || localStorage.getItem("galponUsaCuenta") === "1";
 
         const DURACION_MS = 120 * 1000; // debe coincidir con --duracion-aviso de arriba
 
@@ -276,8 +354,9 @@
         const relleno = document.getElementById("relleno");
 
         let primerSnapshot = true;
-        let ultimoNumeroVisto = null;
+        let ultimoAvisoVisto = null;
         let temporizadorOcultar = null;
+        let cancelarEscucha = null;
 
         // Sonido de aviso (se genera con el navegador, no necesita ningún archivo).
         function reproducirBeep(){
@@ -302,9 +381,17 @@
 
             numeroVenta.textContent = datos.numero ?? "—";
 
-            listaItems.innerHTML = (datos.items || [])
-                .map(texto => `<li>${texto}</li>`)
-                .join("");
+            listaItems.innerHTML = "";
+
+            (datos.items || []).forEach(texto =>{
+
+                const li = document.createElement("li");
+
+                li.textContent = texto;
+
+                listaItems.appendChild(li);
+
+            });
 
             horaAviso.textContent = datos.hora ? "Registrada a las " + datos.hora : "";
 
@@ -332,45 +419,114 @@
 
         }
 
-        onSnapshot(
+        function escuchar(segmentos){
 
-            doc(db, "forralitasDatos", "avisoGalpon"),
+            if(cancelarEscucha) cancelarEscucha();
 
-            (snap) =>{
+            primerSnapshot = true;
 
-                if(!snap.exists()) return;
+            // Nombre del negocio en la esquina.
+            onSnapshot(doc(db, ...segmentos, "configuracionSistema"), (snap) =>{
 
-                const datos = snap.data().datos;
+                const cfg = snap.exists() ? snap.data().datos : null;
 
-                if(!datos) return;
+                const nombre = cfg && cfg.negocio && cfg.negocio.nombre;
 
-                if(primerSnapshot){
+                if(nombre){
 
-                    // Al prender la tele no mostramos la última venta vieja,
-                    // solo empezamos a escuchar avisos nuevos a partir de ahora.
-                    primerSnapshot = false;
+                    document.getElementById("nombreNegocio").textContent = nombre;
 
-                    ultimoNumeroVisto = datos.numero;
-
-                    return;
+                    document.title = nombre + " · Pantalla del galpón";
 
                 }
 
-                if(datos.numero === ultimoNumeroVisto) return;
+            }, () => {});
 
-                ultimoNumeroVisto = datos.numero;
+            cancelarEscucha = onSnapshot(
 
-                mostrarAviso(datos);
+                doc(db, ...segmentos, "avisoGalpon"),
 
-            },
+                (snap) =>{
 
-            (error) =>{
+                    const datos = snap.exists() ? snap.data().datos : null;
 
-                console.error("Error escuchando avisoGalpon:", error);
+                    const clave = datos ? (datos.id ?? datos.numero) : null;
 
-            }
+                    if(primerSnapshot){
 
-        );
+                        // Al prender la tele no mostramos la última venta vieja,
+                        // solo empezamos a escuchar avisos nuevos a partir de ahora.
+                        primerSnapshot = false;
+
+                        ultimoAvisoVisto = clave;
+
+                        return;
+
+                    }
+
+                    if(!datos || clave === ultimoAvisoVisto) return;
+
+                    ultimoAvisoVisto = clave;
+
+                    mostrarAviso(datos);
+
+                },
+
+                (error) =>{
+
+                    console.error("Error escuchando avisoGalpon:", error);
+
+                }
+
+            );
+
+        }
+
+        if(USA_CUENTA){
+
+            localStorage.setItem("galponUsaCuenta", "1");
+
+            const auth = getAuth(app);
+
+            const panel = document.getElementById("panelCuenta");
+
+            onAuthStateChanged(auth, (usuario) =>{
+
+                panel.classList.toggle("activo", !usuario);
+
+                if(usuario) escuchar(["negocios", usuario.uid, "datos"]);
+
+            });
+
+            document.getElementById("formCuenta").addEventListener("submit", async (e) =>{
+
+                e.preventDefault();
+
+                const error = document.getElementById("errorCuenta");
+
+                error.textContent = "";
+
+                try{
+
+                    await signInWithEmailAndPassword(
+                        auth,
+                        document.getElementById("emailCuenta").value.trim(),
+                        document.getElementById("claveCuenta").value
+                    );
+
+                }catch(err){
+
+                    error.textContent = "No se pudo ingresar. Revisá el email y la clave.";
+
+                }
+
+            });
+
+        }else{
+
+            escuchar(["forralitasDatos"]);
+
+        }
 
         // Reloj en la esquina, útil para ver de un vistazo que la pantalla sigue viva.
         function actualizarReloj(){

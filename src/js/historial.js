@@ -1165,7 +1165,7 @@ function imprimirComprobanteVenta(id){
         <tr>
             <td>
                 ${esc(item.nombre)}<br>
-                <small>${formatearCantidadItem(item)} ${unidadVenta(item.modo).toLowerCase()} × ${dinero(item.precio)}</small>
+                <small>${formatearCantidadItem(item)} ${item.modo === "bolsa" ? (Number(item.cantidad) === 1 ? "bolsa" : "bolsas") : "kg"} × ${dinero(item.precio)}</small>
             </td>
             <td class="derecha">${dinero(item.subtotal)}</td>
         </tr>

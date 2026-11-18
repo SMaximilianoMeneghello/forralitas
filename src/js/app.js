@@ -188,6 +188,8 @@ async function conectarYArrancar(conexion){
 
     if(gestorSync) gestorSync.detener();
 
+    migracionesRevisadasConNube = false;
+
     gestorSync = crearGestorSync({
         adaptador,
         almacen: AlmacenLocal,
@@ -392,9 +394,23 @@ function guardarDatos(...tablas){
 
     }catch(e){ /* nada */ }
 
-    if(gestorSync) gestorSync.guardar(tablas);
+    if(!gestorSync) return;
+
+    gestorSync.guardar(tablas);
+
+    // Red de seguridad: cuando se indicaron tablas puntuales, enseguida
+    // se revisan todas, por si el cambio tocó alguna que no se nombró.
+    if(tablas.length){
+
+        clearTimeout(guardadoCompletoPendiente);
+
+        guardadoCompletoPendiente = setTimeout(()=>{ if(gestorSync) gestorSync.guardar([]); }, 400);
+
+    }
 
 }
+
+let guardadoCompletoPendiente = null;
 
 /* ==========================================
    CAMBIOS QUE LLEGAN DE OTRA COMPUTADORA
@@ -404,6 +420,10 @@ let refrescoPendiente = null;
 let tablasCambiadasRemoto = new Set();
 
 function programarRefrescoRemoto(nombre){
+
+    // Las referencias se actualizan en el acto (no esperan al redibujado),
+    // así ninguna acción del usuario trabaja sobre un registro viejo.
+    revincularReferencias();
 
     tablasCambiadasRemoto.add(nombre);
 
@@ -426,6 +446,8 @@ function programarRefrescoRemoto(nombre){
             aplicarDatosNegocio();
 
         }
+
+        if(cambiadas.has("usuarios") || cambiadas.has("productos")) migrarDatos();
 
         revincularReferencias();
 
@@ -538,7 +560,19 @@ function refrescarPantallaActual(){
    INDICADOR DE SINCRONIZACIÓN
 ========================================== */
 
+let migracionesRevisadasConNube = false;
+
 function actualizarIndicadorSync(estado){
+
+    // Apenas se confirma todo con la nube, se revisan los ajustes de
+    // datos pendientes (por si el programa arrancó sin conexión).
+    if(estado && estado.nube && estado.confirmadas === estado.total && !migracionesRevisadasConNube){
+
+        migracionesRevisadasConNube = true;
+
+        setTimeout(migrarDatos, 0);
+
+    }
 
     const el = document.getElementById("estadoSync");
 
@@ -603,9 +637,17 @@ function migrarDatos(){
 
     let cambios = false;
 
+    // Los ajustes 1 y 2 se deciden mirando la configuración guardada en
+    // la nube: hasta no tenerla confirmada no se tocan (se reintenta
+    // solo cuando termina de conectar).
+    const infoConfig = gestorSync ? gestorSync.info("configuracionSistema") : null;
+
+    const configConfirmada = !adaptadorActual || (infoConfig && infoConfig.confirmado);
+
+
     // 1) "Separar por bolsa": antes estaba fijo en el código para
     //    maíz y alfa; ahora es un dato de cada producto.
-    if(!hechas.separarPorProducto && productos.length){
+    if(configConfirmada && !hechas.separarPorProducto && productos.length){
 
         const reglas = {
             "MAIZX40KG": { monto: 11000, grupo: "Maíz" },
@@ -639,7 +681,7 @@ function migrarDatos(){
 
     // 2) El usuario cuyas eliminaciones no quedaban registradas pasa a
     //    ser una opción visible de cada usuario (la maneja el admin).
-    if(!hechas.usuarioSinRegistro && usuarios.length){
+    if(configConfirmada && !hechas.usuarioSinRegistro && usuarios.length){
 
         const u = usuarios.find(x => x.usuario === "maxiforralitas");
 
@@ -650,6 +692,20 @@ function migrarDatos(){
         cambios = true;
 
     }
+
+    // 3) Contraseñas guardadas sin cifrar por versiones anteriores: se
+    //    cifran todas ahora (cada persona sigue usando la misma).
+    usuarios.forEach(u =>{
+
+        if(!u.hash && typeof u.password === "string" && u.password !== ""){
+
+            asignarPassword(u, u.password);
+
+            cambios = true;
+
+        }
+
+    });
 
     if(cambios) guardarDatos("productos", "usuarios", "configuracionSistema");
 

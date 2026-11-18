@@ -1,7 +1,7 @@
 {
   "name": "forralitas-app",
-  "version": "1.0.10",
-  "description": "Sistema de gestión FORRALITAS",
+  "version": "1.1.0",
+  "description": "Sistema de gestión para comercios (ventas, stock, clientes, caja)",
   "author": "FORRALITAS",
   "type": "module",
   "main": "electron/main.js",
@@ -11,17 +11,21 @@
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build && node scripts/copy-js.cjs",
     "build:win": "npm run build && electron-builder --win",
-    "publish:win": "npm run build && electron-builder --win --publish always"
+    "publish:win": "npm run build && electron-builder --win --publish always",
+    "test": "node --test tests/nucleo.test.mjs tests/gestor.simulado.test.mjs",
+    "test:emulador": "node tests/emulador.mjs",
+    "test:sync": "node --test tests/gestor.emulador.test.mjs",
+    "test:app": "node tests/e2e/flujo-local.mjs && node tests/e2e/extras-local.mjs && node tests/e2e/nube.mjs && node tests/e2e/rendimiento.mjs"
   },
   "dependencies": {
-    "electron-updater": "^6.3.9",
-    "firebase": "^13.4.0"
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",
     "cross-env": "^7.0.3",
     "electron": "^37.0.0",
     "electron-builder": "^26.0.0",
+    "firebase": "^13.4.0",
     "vite": "^5.4.0",
     "wait-on": "^8.0.0"
   },

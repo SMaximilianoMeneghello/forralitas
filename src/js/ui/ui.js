@@ -445,6 +445,10 @@ function imprimirHtml(html, clase){
 
     document.body.classList.add("imprimiendo");
 
+    // La zona de impresión solo existe para la impresora (en pantalla
+    // nunca se ve), así que se limpia recién cuando el sistema avisa
+    // que terminó: mientras el cuadro de impresión está abierto todavía
+    // la necesita.
     const terminar = ()=>{
 
         document.body.classList.remove("imprimiendo");
@@ -457,14 +461,7 @@ function imprimirHtml(html, clase){
 
     window.addEventListener("afterprint", terminar);
 
-    setTimeout(()=>{
-
-        window.print();
-
-        // Por si el navegador no avisa "afterprint".
-        setTimeout(terminar, 1500);
-
-    }, 50);
+    setTimeout(()=> window.print(), 50);
 
 }
 

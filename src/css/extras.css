@@ -373,3 +373,43 @@
     }
 
 }
+
+/* ---------- Ajustes varios ---------- */
+
+.nombreUsuario{
+    padding:0 22px;
+}
+
+.nombreUsuario small{
+    font-weight:400;
+    opacity:.8;
+}
+
+.valorDato.saldoDeuda{
+    color:var(--rojo);
+    font-weight:700;
+}
+
+.valorDato.saldoOK{
+    color:var(--verde);
+    font-weight:700;
+}
+
+/* Un nombre de negocio largo entra en dos renglones. */
+.sidebar .logo{
+    height:auto;
+    min-height:80px;
+    padding:14px 12px;
+    text-align:center;
+    font-size:24px;
+    line-height:1.15;
+    word-break:break-word;
+}
+
+.reportesGrid{
+    margin-bottom:20px;
+}
+
+.cardEliminaciones .notaEliminaciones{
+    max-width:760px;
+}
