@@ -1,7 +1,10 @@
-import { app, BrowserWindow, dialog } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import path from "path";
 import { fileURLToPath } from "url";
 import electronUpdater from "electron-updater";
+import * as mpConfig from "./mpConfig.js";
+import * as mpPoint from "./mpPoint.js";
+import * as impresion from "./impresion.js";
 
 const { autoUpdater } = electronUpdater;
 
@@ -27,7 +30,7 @@ function createWindow() {
 
        webPreferences: {
 
-    preload: path.join(__dirname, "preload.js"),
+    preload: path.join(__dirname, "preload.cjs"),
     nodeIntegration: false,
     contextIsolation: true
 
@@ -142,8 +145,52 @@ function iniciarActualizacionesAutomaticas() {
 
 }
 
+/* ==========================================
+   MERCADO PAGO POINT + IMPRESIÓN DE TICKETS
+   ------------------------------------------
+   El renderer solo pide estas acciones por IPC
+   (ver electron/preload.cjs); el token y las
+   llamadas a la API de Mercado Pago quedan
+   siempre en este proceso.
+========================================== */
+
+function registrarHandlersNativos() {
+
+    ipcMain.handle("mp:obtener-config", () => mpConfig.obtenerConfigSegura());
+
+    ipcMain.handle("mp:guardar-credenciales", (evento, datos) => mpConfig.guardarCredenciales(datos || {}));
+
+    ipcMain.handle("mp:listar-dispositivos", () => mpPoint.listarDispositivos());
+
+    ipcMain.handle("mp:crear-cobro", (evento, datos) => mpPoint.crearCobro(datos || {}));
+
+    ipcMain.handle("mp:consultar-cobro", (evento, orderId) => mpPoint.consultarCobro(orderId));
+
+    ipcMain.handle("mp:cancelar-cobro", (evento, orderId) => mpPoint.cancelarCobro(orderId));
+
+    ipcMain.handle("mp:imprimir-ticket", (evento, datos) => mpPoint.imprimirEnTerminal(datos || {}));
+
+    ipcMain.handle("mp:configurar-modo-pdv", () => mpPoint.configurarModoPDV());
+
+    ipcMain.handle("mp:buscar-pagos-recientes", (evento, datos) => mpPoint.buscarPagosRecientes(datos || {}));
+
+    ipcMain.handle("impresora:listar", () => impresion.listarImpresoras());
+
+    ipcMain.handle("impresora:imprimir-ticket", (evento, html) => {
+
+        const printerName = mpConfig.obtenerConfigSegura().printerName;
+
+        return impresion.imprimirTicket(html, printerName);
+
+    });
+
+    ipcMain.handle("impresora:guardar-seleccionada", (evento, nombre) => mpConfig.guardarImpresoraSeleccionada(nombre));
+
+}
+
 app.whenReady().then(() => {
 
+    registrarHandlersNativos();
     createWindow();
     iniciarActualizacionesAutomaticas();
 

@@ -25,8 +25,12 @@ function renderProveedores(){
                     type="button">✕</button>
             </div>
 
-            <button id="btnAgregarProveedor" class="btnAgregar">
+            <button
+                id="btnAgregarProveedor"
+                class="btnAgregar">
+
                 + Agregar proveedor
+
             </button>
 
         </div>
@@ -38,6 +42,7 @@ function renderProveedores(){
                 <table>
 
                     <thead>
+
                         <tr>
                             <th>Nombre</th>
                             <th>Teléfono</th>
@@ -47,9 +52,12 @@ function renderProveedores(){
                             <th>Vencimiento</th>
                             <th>Acciones</th>
                         </tr>
+
                     </thead>
 
-                    <tbody id="tablaProveedoresBody"></tbody>
+                    <tbody id="tablaProveedoresBody">
+
+                    </tbody>
 
                 </table>
 
@@ -100,6 +108,8 @@ function actualizarTablaProveedores(){
 
     if(!tbody) return;
 
+    tbody.innerHTML = "";
+
     const listaFiltrada = !filtroProveedores
         ? proveedores
         : proveedores.filter(p =>
@@ -127,7 +137,7 @@ function actualizarTablaProveedores(){
         tbody.innerHTML = `
             <tr>
                 <td colspan="7" class="tablaVacia">
-                    No se encontraron proveedores para "${esc(filtroProveedores)}".
+                    No se encontraron proveedores para "${filtroProveedores}".
                 </td>
             </tr>
         `;
@@ -136,42 +146,42 @@ function actualizarTablaProveedores(){
 
     }
 
-    tbody.innerHTML = listaFiltrada.map(proveedor =>{
+    listaFiltrada.forEach(proveedor =>{
 
-        const saldo = saldoPendienteProveedor(proveedor);
+        const alerta = obtenerProximoVencimientoProveedor(proveedor);
 
-        return `
+        tbody.innerHTML += `
             <tr>
-                <td><strong>${esc(proveedor.nombre)}</strong></td>
-                <td>${esc(proveedor.telefono || "—")}</td>
-                <td>${esc(proveedor.direccion || "—")}</td>
-                <td>${proveedor.diasPago ? "Cada " + esc(proveedor.diasPago) + " días" : "—"}</td>
-                <td class="${saldo > 0.01 ? "saldoDeuda" : ""}">${dinero(saldo)}</td>
-                <td>${obtenerProximoVencimientoProveedor(proveedor)}</td>
+                <td><strong>${proveedor.nombre}</strong></td>
+                <td>${proveedor.telefono || "—"}</td>
+                <td>${proveedor.direccion || "—"}</td>
+                <td>${proveedor.diasPago ? "Cada " + proveedor.diasPago + " días" : "—"}</td>
+                <td>${dinero(saldoPendienteProveedor(proveedor))}</td>
+                <td>${alerta}</td>
                 <td class="accionesTabla">
                     <button
                         class="btnAccion btnVer"
                         title="Ver detalle"
-                        onclick="verDetalleProveedor('${esc(proveedor.id)}')">
+                        onclick="verDetalleProveedor('${proveedor.id}')">
                         👁️
                     </button>
                     <button
                         class="btnAccion btnEditar"
                         title="Editar"
-                        onclick="editarProveedor('${esc(proveedor.id)}')">
+                        onclick="editarProveedor('${proveedor.id}')">
                         ✏️
                     </button>
                     <button
                         class="btnAccion btnBorrar"
                         title="Eliminar"
-                        onclick="eliminarProveedor('${esc(proveedor.id)}')">
+                        onclick="eliminarProveedor('${proveedor.id}')">
                         🗑️
                     </button>
                 </td>
             </tr>
         `;
 
-    }).join("");
+    });
 
 }
 
@@ -181,8 +191,8 @@ function actualizarTablaProveedores(){
 
 function saldoPendienteProveedor(proveedor){
 
-    return redondear((proveedor.compras || [])
-        .reduce((acc, c) => acc + Number(c.saldoPendiente || 0), 0), 2);
+    return (proveedor.compras || [])
+        .reduce((acc, c) => acc + Number(c.saldoPendiente || 0), 0);
 
 }
 
@@ -191,24 +201,16 @@ function obtenerProximoVencimientoProveedor(proveedor){
     const comprasDebiendo = (proveedor.compras || [])
         .filter(c => Number(c.saldoPendiente || 0) > 0.01 && c.fechaVencimiento);
 
-    if(comprasDebiendo.length === 0){
+    if(comprasDebiendo.length === 0) return `<span class="subMetrica">Al día</span>`;
 
-        return saldoPendienteProveedor(proveedor) > 0.01
-            ? `<span class="subMetrica">Sin fecha</span>`
-            : `<span class="subMetrica">Al día</span>`;
-
-    }
-
-    const proxima = [...comprasDebiendo]
-        .sort((a, b) => String(a.fechaVencimiento).localeCompare(String(b.fechaVencimiento)))[0];
+    const proxima = comprasDebiendo
+        .sort((a, b) => new Date(a.fechaVencimiento) - new Date(b.fechaVencimiento))[0];
 
     const hoy = fechaLocalISO(new Date());
 
-    const texto = esc(proxima.fechaVencimientoTexto || fechaTextoDeISO(proxima.fechaVencimiento));
-
     if(proxima.fechaVencimiento < hoy){
 
-        return `<span style="color:var(--rojo);font-weight:800">⚠ Vencido (${texto})</span>`;
+        return `<span style="color:var(--rojo);font-weight:800">⚠ Vencido (${proxima.fechaVencimientoTexto})</span>`;
 
     }
 
@@ -218,23 +220,7 @@ function obtenerProximoVencimientoProveedor(proveedor){
 
     }
 
-    return `<span class="subMetrica">Vence ${texto}</span>`;
-
-}
-
-/* Fecha de vencimiento de una compra según cada cuántos días se
-   le paga al proveedor. */
-function calcularVencimientoCompra(fechaISO, diasPago){
-
-    if(!diasPago) return { fechaVencimiento: null, fechaVencimientoTexto: null };
-
-    const vencimiento = new Date(fechaISO + "T00:00:00");
-
-    vencimiento.setDate(vencimiento.getDate() + Number(diasPago));
-
-    const iso = fechaLocalISO(vencimiento);
-
-    return { fechaVencimiento: iso, fechaVencimientoTexto: fechaTextoDeISO(iso) };
+    return `<span class="subMetrica">Vence ${proxima.fechaVencimientoTexto}</span>`;
 
 }
 
@@ -307,8 +293,6 @@ function editarProveedor(id){
 
 function guardarProveedor(){
 
-    if(!puede("proveedores")){ avisarSinPermiso(); return; }
-
     const nombre = document.getElementById("nombreProveedor").value.trim();
 
     if(!nombre){
@@ -320,13 +304,15 @@ function guardarProveedor(){
     }
 
     const telefono = document.getElementById("telefonoProveedor").value.trim();
+
     const direccion = document.getElementById("direccionProveedor").value.trim();
+
     const observaciones = document.getElementById("observacionesProveedor").value.trim();
 
     const seleccionDias = document.getElementById("diasPagoProveedor").value;
 
     const diasPago = seleccionDias === "otro"
-        ? Math.round(numeroDe("diasPagoProveedorOtro")) || null
+        ? Number(document.getElementById("diasPagoProveedorOtro").value) || null
         : (seleccionDias ? Number(seleccionDias) : null);
 
     if(proveedorEditandoId){
@@ -335,29 +321,11 @@ function guardarProveedor(){
 
         if(proveedor){
 
-            const cambioDias = (proveedor.diasPago || null) !== diasPago;
-
             proveedor.nombre = nombre;
             proveedor.telefono = telefono;
             proveedor.direccion = direccion;
             proveedor.diasPago = diasPago;
             proveedor.observaciones = observaciones;
-
-            // Si cambió cada cuánto se le paga, se recalculan los
-            // vencimientos de lo que todavía se le debe.
-            if(cambioDias){
-
-                (proveedor.compras || []).forEach(c =>{
-
-                    if(Number(c.saldoPendiente || 0) > 0.01){
-
-                        Object.assign(c, calcularVencimientoCompra(c.fecha, diasPago));
-
-                    }
-
-                });
-
-            }
 
             notificacion("Proveedor actualizado.");
 
@@ -366,7 +334,9 @@ function guardarProveedor(){
     }else{
 
         proveedores.push({
-            id: nuevoId("PR"),
+
+            id: "PR" + Date.now(),
+
             nombre,
             telefono,
             direccion,
@@ -374,6 +344,7 @@ function guardarProveedor(){
             observaciones,
             compras: [],
             pagos: []
+
         });
 
         notificacion("Proveedor agregado correctamente.");
@@ -386,44 +357,43 @@ function guardarProveedor(){
 
     actualizarTablaProveedores();
 
-    if(pantallaVisible("pantallaProveedorDetalle")) renderProveedorDetalle(proveedorDetalleActualId);
-
     proveedorEditandoId = null;
 
 }
 
 function eliminarProveedor(id){
 
-    if(!puede("proveedores")){ avisarSinPermiso(); return; }
-
     const proveedor = proveedores.find(p => p.id === id);
 
     if(!proveedor) return;
 
-    const saldo = saldoPendienteProveedor(proveedor);
-
     confirmar(
-        "¿Eliminar al proveedor " + proveedor.nombre + "?"
-        + (saldo > 0.01 ? " Todavía se le deben " + dinero(saldo) + "." : "")
-        + " Se borra también su historial de compras y pagos.",
+
+        "¿Eliminar al proveedor " + proveedor.nombre + "?",
+
         ()=>{
 
             proveedores = proveedores.filter(p => p.id !== id);
 
             registrarEliminacion(
+
                 "Proveedor",
+
                 "Proveedor " + proveedor.nombre
                 + (proveedor.telefono ? " · " + proveedor.telefono : ""),
+
                 proveedor
+
             );
 
-            guardarDatos("proveedores", "eliminaciones");
+            guardarDatos("proveedores");
 
             actualizarTablaProveedores();
 
             notificacion("Proveedor eliminado.", "error");
 
         }
+
     );
 
 }

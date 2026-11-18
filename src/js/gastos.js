@@ -6,17 +6,15 @@ let gastoEditandoId = null;
 let filtroGastos = "";
 let metodoPagoGasto = "efectivo";
 
-const CATEGORIAS_GASTO = {
-    general: "General",
-    compras: "Compras",
-    servicios: "Servicios",
-    sueldos: "Sueldos",
-    otros: "Otros"
-};
-
 function cambiarMetodoPagoGasto(tipo){
 
     metodoPagoGasto = tipo;
+
+    ["btnEfectivoGasto", "btnTransferenciaGasto", "btnMixtoGasto"].forEach(id =>{
+
+        document.getElementById(id)?.classList.remove("activo");
+
+    });
 
     const mapaBotones = {
         efectivo: "btnEfectivoGasto",
@@ -24,11 +22,7 @@ function cambiarMetodoPagoGasto(tipo){
         mixto: "btnMixtoGasto"
     };
 
-    Object.keys(mapaBotones).forEach(k =>{
-
-        document.getElementById(mapaBotones[k])?.classList.toggle("activo", k === tipo);
-
-    });
+    document.getElementById(mapaBotones[tipo])?.classList.add("activo");
 
     const pagoMixtoGasto = document.getElementById("pagoMixtoGasto");
 
@@ -42,36 +36,55 @@ function renderGastos(){
 
         <div class="gastosBuscador">
 
-            <div class="grupoInput">
-                <label>Desde</label>
-                <input type="date" id="fechaDesdeGasto">
+            <div class="gastosFiltrosFecha">
+
+                <div class="grupoInput">
+                    <label>Desde</label>
+                    <input type="date" id="fechaDesdeGasto">
+                </div>
+
+                <div class="grupoInput">
+                    <label>Hasta</label>
+                    <input type="date" id="fechaHastaGasto">
+                </div>
+
+                <div class="gastosAcciones">
+
+                    <button class="btnBuscar" id="btnBuscarGasto">Buscar</button>
+
+                    <button class="btnHoy" id="btnHoyGasto">Hoy</button>
+
+                    <button class="btnTodas" id="btnTodasGasto">Todos</button>
+
+                </div>
+
             </div>
 
-            <div class="grupoInput">
-                <label>Hasta</label>
-                <input type="date" id="fechaHastaGasto">
+            <div class="gastosFiltrosBuscar">
+
+                <div class="grupoInput grupoInputBuscarTexto">
+                    <label>Buscar</label>
+                    <input
+                        type="text"
+                        id="buscarTextoGasto"
+                        placeholder="Descripción o categoría..."
+                        autocomplete="off">
+                </div>
+
+                <div class="grupoInput gastosAgregarWrap">
+                    <label aria-hidden="true">&nbsp;</label>
+                    <button
+                        id="btnAgregarGasto"
+                        class="btnAgregar">
+
+                        + Agregar gasto
+
+                    </button>
+                </div>
+
             </div>
-
-            <div class="grupoInput grupoInputBuscarTexto">
-                <label>Buscar</label>
-                <input
-                    type="text"
-                    id="buscarTextoGasto"
-                    placeholder="Descripción o categoría..."
-                    autocomplete="off">
-            </div>
-
-            <button class="btnBuscar" id="btnBuscarGasto">Buscar</button>
-
-            <button class="btnHoy" id="btnHoyGasto">Hoy</button>
-
-            <button class="btnTodas" id="btnTodasGasto">Todos</button>
-
-            <button id="btnAgregarGasto" class="btnAgregar">+ Agregar gasto</button>
 
         </div>
-
-        <div class="resumenHistorial" id="resumenGastos"></div>
 
         <div class="card">
 
@@ -80,6 +93,7 @@ function renderGastos(){
                 <table>
 
                     <thead>
+
                         <tr>
                             <th>Fecha</th>
                             <th>Descripción</th>
@@ -89,9 +103,12 @@ function renderGastos(){
                             <th>Monto</th>
                             <th>Acciones</th>
                         </tr>
+
                     </thead>
 
-                    <tbody id="tablaGastosBody"></tbody>
+                    <tbody id="tablaGastosBody">
+
+                    </tbody>
 
                 </table>
 
@@ -101,7 +118,9 @@ function renderGastos(){
 
     `;
 
-    document.getElementById("btnAgregarGasto").onclick = abrirModalNuevoGasto;
+    const btnAgregar = document.getElementById("btnAgregarGasto");
+
+    if(btnAgregar) btnAgregar.onclick = abrirModalNuevoGasto;
 
     document.getElementById("btnBuscarGasto").onclick = buscarGastos;
 
@@ -153,64 +172,13 @@ function buscarGastos(){
 
 }
 
-/* Un empleado puede corregir o borrar un gasto si tiene el permiso
-   general o si lo cargó él mismo hoy. */
-function puedeTocarGasto(gasto){
-
-    if(puede("gastos")) return true;
-
-    return !!usuarioActual
-        && !!gasto.vendedor
-        && gasto.vendedor.usuario === usuarioActual.usuario
-        && gasto.fecha === fechaLocalISO(new Date());
-
-}
-
-function gastosFiltrados(desde, hasta, texto){
-
-    return [...gastos]
-        .sort((a,b)=> String(b.fecha || "").localeCompare(String(a.fecha || "")))
-        .filter(g =>{
-
-            const f = g.fecha || "";
-
-            if(desde && f < desde) return false;
-
-            if(hasta && f > hasta) return false;
-
-            if(texto
-                && !(g.descripcion || "").toLowerCase().includes(texto)
-                && !(g.categoria || "").toLowerCase().includes(texto)) return false;
-
-            return true;
-
-        });
-
-}
-
 function actualizarTablaGastos(desde = null, hasta = null, texto = ""){
 
     const tbody = document.getElementById("tablaGastosBody");
 
     if(!tbody) return;
 
-    const lista = gastosFiltrados(desde, hasta, texto);
-
-    const resumen = document.getElementById("resumenGastos");
-
-    if(resumen){
-
-        const total = lista.reduce((acc, g) => acc + Number(g.monto || 0), 0);
-
-        resumen.innerHTML = `
-            <span><strong>${lista.length}</strong> gastos</span>
-            <span>Total: <strong class="saldoDeuda">${dinero(total)}</strong></span>
-            <button class="btnSecundario" id="btnExportarGastos" ${lista.length ? "" : "disabled"}>⬇ Exportar a Excel</button>
-        `;
-
-        document.getElementById("btnExportarGastos").onclick = () => exportarGastosCSV(lista);
-
-    }
+    tbody.innerHTML = "";
 
     if(gastos.length === 0){
 
@@ -226,7 +194,36 @@ function actualizarTablaGastos(desde = null, hasta = null, texto = ""){
 
     }
 
-    if(lista.length === 0){
+    let gastosOrdenados = [...gastos].sort((a,b)=>
+        new Date(b.fecha || 0) - new Date(a.fecha || 0)
+    );
+
+    if(desde || hasta){
+
+        gastosOrdenados = gastosOrdenados.filter(g =>{
+
+            const f = g.fecha || "";
+
+            if(desde && f < desde) return false;
+
+            if(hasta && f > hasta) return false;
+
+            return true;
+
+        });
+
+    }
+
+    if(texto){
+
+        gastosOrdenados = gastosOrdenados.filter(g =>
+            (g.descripcion || "").toLowerCase().includes(texto)
+            || (g.categoria || "").toLowerCase().includes(texto)
+        );
+
+    }
+
+    if(gastosOrdenados.length === 0){
 
         tbody.innerHTML = `
             <tr>
@@ -246,91 +243,40 @@ function actualizarTablaGastos(desde = null, hasta = null, texto = ""){
         mixto: "Mixto"
     };
 
-    tbody.innerHTML = lista.map(gasto => `
-        <tr>
-            <td>${esc(gasto.fechaTexto || fechaTextoDeISO(gasto.fecha))}</td>
-            <td>${esc(gasto.descripcion || "—")}</td>
-            <td>${esc(CATEGORIAS_GASTO[gasto.categoria] || gasto.categoria || "General")}</td>
-            <td>${etiquetaPago[gasto.metodoPago] || "Efectivo"}</td>
-            <td>${esc((gasto.vendedor && gasto.vendedor.nombre) || "—")}</td>
-            <td class="saldoDeuda">${dinero(gasto.monto || 0)}</td>
-            <td class="accionesTabla">
-                ${puedeTocarGasto(gasto) ? `
-                <button
-                    class="btnAccion btnEditar"
-                    title="Editar"
-                    onclick="editarGasto('${esc(gasto.id)}')">
-                    ✏️
-                </button>
-                <button
-                    class="btnAccion btnBorrar"
-                    title="Eliminar"
-                    onclick="eliminarGasto('${esc(gasto.id)}')">
-                    🗑️
-                </button>
-                ` : "—"}
-            </td>
-        </tr>
-    `).join("");
+    gastosOrdenados.forEach(gasto =>{
 
-}
-
-function exportarGastosCSV(lista){
-
-    const filas = [["Fecha", "Descripción", "Categoría", "Pago", "Efectivo", "Transferencia", "Cargado por", "Monto"]];
-
-    lista.forEach(g =>{
-
-        const pago = g.pago || { efectivo: g.monto || 0, transferencia: 0 };
-
-        filas.push([
-            g.fechaTexto || fechaTextoDeISO(g.fecha),
-            g.descripcion || "",
-            CATEGORIAS_GASTO[g.categoria] || g.categoria || "General",
-            g.metodoPago || "efectivo",
-            Number(pago.efectivo || 0),
-            Number(pago.transferencia || 0),
-            (g.vendedor && g.vendedor.nombre) || "",
-            Number(g.monto || 0)
-        ]);
+        tbody.innerHTML += `
+            <tr>
+                <td>${gasto.fechaTexto || "—"}</td>
+                <td>${gasto.descripcion || "—"}</td>
+                <td>${gasto.categoria || "general"}</td>
+                <td>${etiquetaPago[gasto.metodoPago] || "Efectivo"}</td>
+                <td>${(gasto.vendedor && gasto.vendedor.nombre) || "—"}</td>
+                <td class="saldoDeuda">${dinero(gasto.monto || 0)}</td>
+                <td class="accionesTabla">
+                    <button
+                        class="btnAccion btnEditar"
+                        title="Editar"
+                        onclick="editarGasto('${gasto.id}')">
+                        ✏️
+                    </button>
+                    <button
+                        class="btnAccion btnBorrar"
+                        title="Eliminar"
+                        onclick="eliminarGasto('${gasto.id}')">
+                        🗑️
+                    </button>
+                </td>
+            </tr>
+        `;
 
     });
-
-    descargarArchivo("Gastos_" + fechaLocalISO(new Date()) + ".csv", generarCSV(filas), "text/csv;charset=utf-8");
-
-    notificacion("Gastos exportados (" + lista.length + ").");
 
 }
 
 /* ==========================================
    MODAL GASTO
 ========================================== */
-
-function prepararCargadoPorGasto(loginActual){
-
-    // Solo el administrador puede cambiar a nombre de quién queda el gasto.
-    const grupo = document.getElementById("grupoCargadoPorGasto");
-
-    grupo.classList.toggle("oculto", !esAdmin());
-
-    if(!esAdmin()) return;
-
-    const select = document.getElementById("cargadoPorGasto");
-
-    let opciones = `<option value="">— Sin asignar —</option>`
-        + usuarios.map(u => `<option value="${esc(u.usuario)}">${esc(u.nombre)}</option>`).join("");
-
-    if(loginActual && !usuarios.some(u => u.usuario === loginActual)){
-
-        opciones += `<option value="${esc(loginActual)}">${esc(loginActual)} (eliminado)</option>`;
-
-    }
-
-    select.innerHTML = opciones;
-
-    select.value = loginActual || "";
-
-}
 
 function abrirModalNuevoGasto(){
 
@@ -346,8 +292,6 @@ function abrirModalNuevoGasto(){
 
     cambiarMetodoPagoGasto("efectivo");
 
-    prepararCargadoPorGasto(usuarioActual ? usuarioActual.usuario : "");
-
     abrir("modalGasto");
 
     setTimeout(()=> document.getElementById("descripcionGasto").focus(), 100);
@@ -360,21 +304,13 @@ function editarGasto(id){
 
     if(!gasto) return;
 
-    if(!puedeTocarGasto(gasto)){ avisarSinPermiso(); return; }
-
     gastoEditandoId = id;
 
     document.getElementById("tituloModalGasto").textContent = "Editar Gasto";
 
     document.getElementById("descripcionGasto").value = gasto.descripcion || "";
     document.getElementById("montoGasto").value = gasto.monto || "";
-
-    const categoria = document.getElementById("categoriaGasto");
-
-    categoria.value = gasto.categoria || "general";
-
-    if(categoria.value !== (gasto.categoria || "general")) categoria.value = "otros";
-
+    document.getElementById("categoriaGasto").value = gasto.categoria || "general";
     document.getElementById("fechaGasto").value = gasto.fecha || fechaLocalISO(new Date());
 
     const pago = gasto.pago || { efectivo: gasto.monto || 0, transferencia: 0 };
@@ -383,8 +319,6 @@ function editarGasto(id){
     document.getElementById("montoTransferenciaGasto").value = pago.transferencia || "";
 
     cambiarMetodoPagoGasto(gasto.metodoPago || "efectivo");
-
-    prepararCargadoPorGasto(gasto.vendedor ? gasto.vendedor.usuario : "");
 
     abrir("modalGasto");
 
@@ -411,7 +345,7 @@ function guardarGasto(){
 
     }
 
-    const monto = numeroDe("montoGasto");
+    const monto = Number(document.getElementById("montoGasto").value) || 0;
 
     if(monto <= 0){
 
@@ -425,28 +359,35 @@ function guardarGasto(){
 
     const fecha = document.getElementById("fechaGasto").value || fechaLocalISO(new Date());
 
-    const fechaTexto = fechaTextoDeISO(fecha);
+    const fechaTexto = new Date(fecha + "T00:00:00").toLocaleDateString("es-AR");
 
-    const pago = armarDesglosePago(metodoPagoGasto, monto, "montoEfectivoGasto", "montoTransferenciaGasto");
+    let pago = { efectivo: 0, transferencia: 0 };
 
-    if(!pago) return;
+    if(metodoPagoGasto === "efectivo"){
 
-    // A nombre de quién queda: el admin puede elegirlo; si no, quien lo carga.
-    let vendedor = usuarioActual
-        ? { usuario: usuarioActual.usuario, nombre: usuarioActual.nombre }
-        : null;
+        pago.efectivo = monto;
 
-    let adminEligio = false;
+    }else if(metodoPagoGasto === "transferencia"){
 
-    if(esAdmin()){
+        pago.transferencia = monto;
 
-        const login = document.getElementById("cargadoPorGasto").value;
+    }else{
 
-        const u = usuarios.find(x => x.usuario === login);
+        pago.efectivo = Number(document.getElementById("montoEfectivoGasto").value) || 0;
+        pago.transferencia = Number(document.getElementById("montoTransferenciaGasto").value) || 0;
 
-        adminEligio = true;
+        const suma = pago.efectivo + pago.transferencia;
 
-        vendedor = u ? { usuario: u.usuario, nombre: u.nombre } : null;
+        if(Math.abs(suma - monto) > 0.01){
+
+            notificacion(
+                "Los montos del pago mixto deben sumar " + dinero(monto) + ".",
+                "warning"
+            );
+
+            return;
+
+        }
 
     }
 
@@ -456,8 +397,6 @@ function guardarGasto(){
 
         if(gasto){
 
-            if(!puedeTocarGasto(gasto)){ avisarSinPermiso(); return; }
-
             gasto.descripcion = descripcion;
             gasto.monto = monto;
             gasto.categoria = categoria;
@@ -466,14 +405,6 @@ function guardarGasto(){
             gasto.metodoPago = metodoPagoGasto;
             gasto.pago = pago;
 
-            // Al editar no se cambia quién lo cargó, salvo que el admin
-            // lo elija (y siempre que no sea un usuario ya eliminado).
-            if(adminEligio && (vendedor || !document.getElementById("cargadoPorGasto").value)){
-
-                gasto.vendedor = vendedor;
-
-            }
-
             notificacion("Gasto actualizado.");
 
         }
@@ -481,7 +412,9 @@ function guardarGasto(){
     }else{
 
         gastos.push({
-            id: nuevoId("G"),
+
+            id: "G" + Date.now(),
+
             descripcion,
             monto,
             categoria,
@@ -492,7 +425,10 @@ function guardarGasto(){
 
             // Para que cada caja quede separada por empleado, igual que
             // las ventas: este gasto queda a nombre de quien lo cargó.
-            vendedor
+            vendedor: usuarioActual
+                ? { usuario: usuarioActual.usuario, nombre: usuarioActual.nombre }
+                : null
+
         });
 
         notificacion("Gasto agregado correctamente.");
@@ -515,28 +451,33 @@ function eliminarGasto(id){
 
     if(!gasto) return;
 
-    if(!puedeTocarGasto(gasto)){ avisarSinPermiso(); return; }
-
     confirmar(
-        "¿Eliminar el gasto \"" + gasto.descripcion + "\" por " + dinero(gasto.monto) + "?",
+
+        "¿Eliminar el gasto \"" + gasto.descripcion + "\"?",
+
         ()=>{
 
             gastos = gastos.filter(g => g.id !== id);
 
             registrarEliminacion(
+
                 "Gasto",
+
                 "Gasto " + gasto.descripcion
                 + " · " + dinero(gasto.monto),
+
                 gasto
+
             );
 
-            guardarDatos("gastos", "eliminaciones");
+            guardarDatos("gastos");
 
             refrescarTablaGastosConFiltrosActuales();
 
             notificacion("Gasto eliminado.", "error");
 
         }
+
     );
 
 }

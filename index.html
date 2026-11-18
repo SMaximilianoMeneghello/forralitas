@@ -8,9 +8,13 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-    <meta name="theme-color" content="#2e7d32">
+    <meta name="theme-color" content="#1F5D3A">
 
-    <title>Sistema de gestión</title>
+    <title>FORRALITAS APP</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- CSS GENERAL -->
     <link rel="stylesheet" href="./src/css/style.css">
@@ -29,6 +33,7 @@
     <link rel="stylesheet" href="./src/css/historial.css">
     <link rel="stylesheet" href="./src/css/reportes.css">
     <link rel="stylesheet" href="./src/css/configuracion.css">
+    <link rel="stylesheet" href="./src/css/configuracion-pestanas.css">
 
     <!-- MODALES -->
     <link rel="stylesheet" href="./src/css/modales.css">
@@ -36,118 +41,24 @@
     <!-- LOGIN -->
     <link rel="stylesheet" href="./src/css/login.css">
 
-    <!-- AGREGADOS (edición de ventas, impresión, pantallas de arranque) -->
-    <link rel="stylesheet" href="./src/css/extras.css">
+    <!-- TEMA FUTURO (siempre al final: capa visual sobre la paleta) -->
+    <link rel="stylesheet" href="./src/css/tema-futuro.css">
+    <link rel="stylesheet" href="./src/css/calendario.css">
+    <link rel="stylesheet" href="./src/css/selects.css">
 
 </head>
 
 <body>
 
 <!-- ===================================== -->
-<!-- PANTALLA DE CARGA -->
-<!-- ===================================== -->
-
-<div id="pantallaInicio" class="pantallaArranque">
-
-    <div class="loginCaja">
-
-        <div class="loginLogo nombreNegocio">Sistema de gestión</div>
-
-        <div class="loginSub" id="textoPantallaInicio">Cargando…</div>
-
-        <button type="button" id="btnReintentarInicio" class="oculto">Reintentar</button>
-
-    </div>
-
-</div>
-
-<!-- ===================================== -->
-<!-- VINCULAR ESTA PC A LA CUENTA DEL NEGOCIO -->
-<!-- ===================================== -->
-
-<div id="pantallaConexion" class="pantallaArranque" style="display:none">
-
-    <form id="formConexion" class="loginCaja">
-
-        <div class="loginLogo">Sistema de gestión</div>
-
-        <div class="loginSub">
-            Ingresá la cuenta del negocio para usar el programa en esta computadora.
-            Se hace una sola vez por PC.
-        </div>
-
-        <div id="conexionAviso" class="loginAviso"></div>
-
-        <label>Email del negocio</label>
-
-        <input id="conexionEmail" type="text" autocomplete="username" placeholder="negocio@ejemplo.com">
-
-        <label>Clave del negocio</label>
-
-        <input id="conexionClave" type="password" autocomplete="current-password">
-
-        <button type="submit" id="btnConexion">Vincular esta PC</button>
-
-        <div id="conexionError" class="loginError"></div>
-
-        <a href="#" id="enlaceSinCuenta" class="loginEnlace">Tengo una instalación anterior sin cuenta</a>
-
-    </form>
-
-</div>
-
-<!-- ===================================== -->
-<!-- PRIMER USO: CREAR EL ADMINISTRADOR -->
-<!-- ===================================== -->
-
-<div id="pantallaPrimerAdmin" class="pantallaArranque" style="display:none">
-
-    <form id="formPrimerAdmin" class="loginCaja">
-
-        <div class="loginLogo">¡Bienvenido!</div>
-
-        <div class="loginSub">
-            Este negocio todavía no tiene usuarios. Creá la cuenta del administrador
-            (la persona que va a poder ver y cambiar todo).
-        </div>
-
-        <label>Nombre del negocio</label>
-
-        <input id="primerNegocio" type="text" autocomplete="off" placeholder="Ej: Forrajería San Martín">
-
-        <label>Tu nombre</label>
-
-        <input id="primerNombre" type="text" autocomplete="off" placeholder="Ej: Laura">
-
-        <label>Usuario para ingresar</label>
-
-        <input id="primerUsuario" type="text" autocomplete="off" placeholder="Ej: laura">
-
-        <label>Contraseña (mínimo 6 caracteres)</label>
-
-        <input id="primerClave" type="password" autocomplete="new-password">
-
-        <label>Repetir contraseña</label>
-
-        <input id="primerClaveRepetir" type="password" autocomplete="new-password">
-
-        <button type="submit">Crear administrador y empezar</button>
-
-        <div id="primerAdminError" class="loginError"></div>
-
-    </form>
-
-</div>
-
-<!-- ===================================== -->
 <!-- PANTALLA DE LOGIN -->
 <!-- ===================================== -->
 
-<div id="pantallaLogin" class="pantallaArranque" style="display:none">
+<div id="pantallaLogin">
 
     <form id="formLogin" class="loginCaja">
 
-        <div class="loginLogo nombreNegocio">Sistema de gestión</div>
+        <div class="loginLogo">FORRALITAS</div>
 
         <div class="loginSub">Iniciá sesión para continuar</div>
 
@@ -183,7 +94,11 @@
 
     <aside class="sidebar">
 
-        <div class="logo nombreNegocio">Sistema de gestión</div>
+        <div class="logo">
+
+            FORRALITAS
+
+        </div>
 
         <button id="Dashboard">
 
@@ -256,8 +171,6 @@
             🗑️ Eliminaciones
 
         </button>
-
-        <div id="estadoSync" class="estadoSync"></div>
 
         <div id="usuarioActualUI"></div>
 
@@ -400,31 +313,8 @@
         </div>
 
         <div class="grupoInput">
-            <label>Stock mínimo (avisa cuando queda esto o menos)</label>
+            <label>Stock mínimo</label>
             <input id="stockMinimoProducto" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
-        </div>
-
-        <div id="camposAdminProducto">
-
-            <hr style="margin:18px 0;border:none;border-top:1px solid #eee">
-
-            <p class="ayudaConfig">Opcional · solo lo ve el administrador</p>
-
-            <div class="grupoInput">
-                <label>Costo por bolsa (para calcular la ganancia en Caja)</label>
-                <input id="costoBolsaProducto" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
-            </div>
-
-            <div class="grupoInput">
-                <label>Separar por cada bolsa vendida ($ para reponer mercadería)</label>
-                <input id="separarProducto" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
-            </div>
-
-            <div class="grupoInput">
-                <label>Grupo de "separar" (ej: Maíz). Los productos del mismo grupo se suman juntos en Caja</label>
-                <input id="grupoSepararProducto" type="text" autocomplete="off">
-            </div>
-
         </div>
 
         <div class="accionesModal">
@@ -470,7 +360,6 @@
         <div class="grupoInput">
             <label>Saldo</label>
             <input id="saldoCliente" type="text" inputmode="decimal" autocomplete="off" value="0" oninput="limpiarNumero(this)">
-            <small id="ayudaSaldoCliente" class="ayudaCampo"></small>
         </div>
 
         <div class="grupoInput">
@@ -517,6 +406,55 @@
         <div class="accionesModal">
             <button onclick="confirmarCantidad()" class="btnGuardar">Agregar</button>
             <button onclick="cerrarModalCantidad()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL COBRO CON POINT SMART -->
+<!-- ========================================== -->
+
+<div
+    id="modalPointSmart"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2>📟 Cobrando con Point Smart</h2>
+
+        <p id="textoPointSmart">Esperando a que el cliente pague en el dispositivo...</p>
+
+        <p class="previewCantidad" id="montoPointSmart"></p>
+
+        <div class="accionesModal">
+            <button onclick="cancelarCobroPointSmart()" class="btnCancelar">Cancelar cobro</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL ESPERA DE TRANSFERENCIA (MERCADO PAGO) -->
+<!-- ========================================== -->
+
+<div
+    id="modalEsperaTransferencia"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2>🔔 Esperando transferencia</h2>
+
+        <p id="textoEsperaTransferencia">Esperando a que se acredite la transferencia en Mercado Pago...</p>
+
+        <p class="previewCantidad" id="montoEsperaTransferencia"></p>
+
+        <div class="accionesModal">
+            <button onclick="confirmarSinEsperarTransferenciaMP()" class="btnGuardar">Registrar sin esperar</button>
+            <button onclick="cancelarEsperaTransferenciaMP()" class="btnCancelar">Cancelar</button>
         </div>
 
     </div>
@@ -577,7 +515,7 @@
         </div>
 
         <div class="grupoInput">
-            <label>Venta a la que se aplica el pago</label>
+            <label>Deudas que se saldan (de la más antigua a la más nueva)</label>
             <div id="listaVentasPendientesPago" class="listaVentasPendientesPago">
                 <!-- se llena dinámicamente -->
             </div>
@@ -673,11 +611,6 @@
         <div class="grupoInput">
             <label>Fecha</label>
             <input id="fechaGasto" type="date">
-        </div>
-
-        <div class="grupoInput oculto" id="grupoCargadoPorGasto">
-            <label>Cargado por (a nombre de quién queda en la Caja)</label>
-            <select id="cargadoPorGasto"></select>
         </div>
 
         <div class="accionesModal">
@@ -788,7 +721,7 @@
                 type="text"
                 inputmode="numeric"
                 autocomplete="off"
-                >
+                oninput="limpiarNumero(this)">
         </div>
 
         <div id="previaIngredientesProduccion" class="previaIngredientesProduccion"></div>
@@ -799,6 +732,8 @@
         </div>
 
     </div>
+
+</div>
 
 </div>
 
@@ -856,7 +791,7 @@
 
         <div class="grupoInput" id="grupoPasswordUsuarioNuevo">
             <label>Contraseña</label>
-            <input id="passwordUsuarioNuevo" type="password" autocomplete="new-password">
+            <input id="passwordUsuarioNuevo" type="text" autocomplete="off">
         </div>
 
         <div class="grupoInput">
@@ -866,11 +801,6 @@
                 <option value="admin">Administrador</option>
             </select>
         </div>
-
-        <label class="filtroCheck">
-            <input id="ocultarEliminacionesUsuario" type="checkbox">
-            No anotar en el panel de eliminaciones lo que borre este usuario
-        </label>
 
         <div class="accionesModal">
             <button id="guardarUsuarioAdmin" class="btnGuardar">Guardar</button>
@@ -970,7 +900,7 @@
 
     <div class="modalContenido">
 
-        <h2 id="tituloModalCompraProveedor">Registrar compra</h2>
+        <h2>Registrar compra</h2>
 
         <div class="grupoInput">
             <label>Qué le compramos</label>
@@ -1035,160 +965,6 @@
 </div>
 
 <!-- ========================================== -->
-<!-- MODAL EDITAR VENTA (ADMIN) -->
-<!-- ========================================== -->
-
-<div
-    id="modalEditarVenta"
-    class="modal oculto">
-
-    <div class="modalContenido modalAncho">
-
-        <h2 id="tituloEditarVenta">Editar venta</h2>
-
-        <div class="filaConfig">
-
-            <div class="grupoInput">
-                <label>Fecha y hora</label>
-                <input id="fechaEditarVenta" type="datetime-local">
-            </div>
-
-            <div class="grupoInput">
-                <label>Cliente</label>
-                <select id="clienteEditarVenta"></select>
-            </div>
-
-            <div class="grupoInput">
-                <label>Vendedor</label>
-                <select id="vendedorEditarVenta"></select>
-            </div>
-
-        </div>
-
-        <div class="tablaEditarVenta">
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th>Cantidad</th>
-                        <th>Precio</th>
-                        <th>Subtotal</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody id="itemsEditarVenta"></tbody>
-            </table>
-
-        </div>
-
-        <div class="agregarItemEditarVenta">
-
-            <select id="productoAgregarEditarVenta"></select>
-
-            <select id="modoAgregarEditarVenta">
-                <option value="bolsa">Bolsas</option>
-                <option value="kg">Kg</option>
-                <option value="dinero">$ (monto)</option>
-            </select>
-
-            <input id="cantidadAgregarEditarVenta" type="text" inputmode="decimal" autocomplete="off" placeholder="Cantidad" oninput="limpiarNumero(this)">
-
-            <button type="button" class="btnSecundario" id="btnAgregarItemEditarVenta">+ Agregar</button>
-
-        </div>
-
-        <div class="totalEditarVenta">
-            TOTAL: <strong id="totalEditarVenta">$0</strong>
-        </div>
-
-        <div class="filaConfig">
-
-            <div class="grupoInput">
-                <label>Forma de pago</label>
-                <select id="metodoEditarVenta">
-                    <option value="efectivo">Efectivo</option>
-                    <option value="transferencia">Transferencia</option>
-                    <option value="mixto">Mixto</option>
-                    <option value="debe">DEBE (fiado)</option>
-                </select>
-            </div>
-
-            <div class="grupoInput oculto" id="mixtoEditarVenta">
-                <label>Efectivo / Transferencia</label>
-                <div class="dosCampos">
-                    <input id="efectivoEditarVenta" type="text" inputmode="decimal" autocomplete="off" placeholder="Efectivo" oninput="limpiarNumero(this)">
-                    <input id="transferenciaEditarVenta" type="text" inputmode="decimal" autocomplete="off" placeholder="Transferencia" oninput="limpiarNumero(this)">
-                </div>
-            </div>
-
-        </div>
-
-        <p id="notaPagoEditarVenta" class="ayudaConfig"></p>
-
-        <label class="filtroCheck">
-            <input id="ajustarStockEditarVenta" type="checkbox" checked>
-            Ajustar el stock según los cambios de productos y cantidades
-        </label>
-
-        <div class="accionesModal">
-            <button id="guardarVentaEditada" class="btnGuardar">Guardar cambios</button>
-            <button onclick="cerrar('modalEditarVenta')" class="btnCancelar">Cancelar</button>
-        </div>
-
-    </div>
-
-</div>
-
-<!-- ========================================== -->
-<!-- MODAL EDITAR PAGO (ADMIN) -->
-<!-- ========================================== -->
-
-<div
-    id="modalEditarPago"
-    class="modal oculto">
-
-    <div class="modalContenido modalPequeño">
-
-        <h2>Editar pago</h2>
-
-        <div class="grupoInput">
-            <label>Monto</label>
-            <input id="montoEditarPago" type="text" inputmode="decimal" autocomplete="off" oninput="limpiarNumero(this)">
-        </div>
-
-        <div class="grupoInput">
-            <label>Fecha y hora</label>
-            <input id="fechaEditarPago" type="datetime-local">
-        </div>
-
-        <div class="grupoInput" id="grupoMetodoEditarPago">
-            <label>Método de pago</label>
-            <select id="metodoEditarPago">
-                <option value="efectivo">Efectivo</option>
-                <option value="transferencia">Transferencia</option>
-                <option value="mixto">Mixto</option>
-            </select>
-        </div>
-
-        <div class="grupoInput oculto" id="mixtoEditarPago">
-            <label>Efectivo / Transferencia</label>
-            <div class="dosCampos">
-                <input id="efectivoEditarPago" type="text" inputmode="decimal" autocomplete="off" placeholder="Efectivo" oninput="limpiarNumero(this)">
-                <input id="transferenciaEditarPago" type="text" inputmode="decimal" autocomplete="off" placeholder="Transferencia" oninput="limpiarNumero(this)">
-            </div>
-        </div>
-
-        <div class="accionesModal">
-            <button id="guardarPagoEditado" class="btnGuardar">Guardar</button>
-            <button onclick="cerrar('modalEditarPago')" class="btnCancelar">Cancelar</button>
-        </div>
-
-    </div>
-
-</div>
-
-<!-- ========================================== -->
 <!-- MODAL CONFIRMACION -->
 <!-- ========================================== -->
 
@@ -1222,14 +998,13 @@
 <!-- ========================================== -->
 
 <script type="module" src="./src/js/firebase/firebase-init.js"></script>
-<script src="./src/js/datos/sync-nucleo.js"></script>
-<script src="./src/js/datos/almacen-local.js"></script>
-<script src="./src/js/datos/sync-gestor.js"></script>
 <script src="./src/js/ui/ui.js"></script>
+<script src="./src/js/negocio.js"></script>
 <script src="./src/js/auth/auth.js"></script>
 <script src="./src/js/app.js"></script>
 <script src="./src/js/dashboard.js"></script>
 <script src="./src/js/productos.js"></script>
+<script src="./src/js/ticket.js"></script>
 <script src="./src/js/modules/ventas.js"></script>
 <script src="./src/js/clientes.js"></script>
 <script src="./src/js/clienteDetalle.js"></script>
@@ -1243,6 +1018,9 @@
 <script src="./src/js/historial.js"></script>
 <script src="./src/js/reportes.js"></script>
 <script src="./src/js/configuracion.js"></script>
+<script src="./src/js/efectos.js"></script>
+<script src="./src/js/calendario.js"></script>
+<script src="./src/js/selects.js"></script>
 
 </body>
 

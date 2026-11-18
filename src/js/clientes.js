@@ -25,12 +25,12 @@ function renderClientes(){
                     type="button">✕</button>
             </div>
 
-            <label class="filtroCheck">
-                <input type="checkbox" id="soloDeudores"> Solo los que deben
-            </label>
+            <button
+                id="btnAgregarCliente"
+                class="btnAgregar">
 
-            <button id="btnAgregarCliente" class="btnAgregar">
                 + Agregar cliente
+
             </button>
 
         </div>
@@ -42,6 +42,7 @@ function renderClientes(){
                 <table>
 
                     <thead>
+
                         <tr>
                             <th>Nombre</th>
                             <th>Dirección</th>
@@ -49,9 +50,12 @@ function renderClientes(){
                             <th>Saldo</th>
                             <th>Acciones</th>
                         </tr>
+
                     </thead>
 
-                    <tbody id="tablaClientesBody"></tbody>
+                    <tbody id="tablaClientesBody">
+
+                    </tbody>
 
                 </table>
 
@@ -92,8 +96,6 @@ function renderClientes(){
 
     });
 
-    document.getElementById("soloDeudores").addEventListener("change", actualizarTablaClientes);
-
     actualizarTablaClientes();
 
 }
@@ -104,17 +106,15 @@ function actualizarTablaClientes(){
 
     if(!tbody) return;
 
-    const soloDeudores = !!(document.getElementById("soloDeudores") || {}).checked;
+    tbody.innerHTML = "";
 
-    let listaFiltrada = !filtroClientes
+    const listaFiltrada = !filtroClientes
         ? clientes
         : clientes.filter(c =>
             (c.nombre || "").toLowerCase().includes(filtroClientes)
             || (c.direccion || "").toLowerCase().includes(filtroClientes)
             || (c.telefono || "").toLowerCase().includes(filtroClientes)
         );
-
-    if(soloDeudores) listaFiltrada = listaFiltrada.filter(c => Number(c.saldo || 0) > 0.01);
 
     if(clientes.length === 0){
 
@@ -135,7 +135,7 @@ function actualizarTablaClientes(){
         tbody.innerHTML = `
             <tr>
                 <td colspan="5" class="tablaVacia">
-                    No se encontraron clientes${filtroClientes ? ` para "${esc(filtroClientes)}"` : ""}.
+                    No se encontraron clientes para "${filtroClientes}".
                 </td>
             </tr>
         `;
@@ -144,46 +144,42 @@ function actualizarTablaClientes(){
 
     }
 
-    const editar = puede("editarClientes");
-
-    tbody.innerHTML = listaFiltrada.map(cliente =>{
+    listaFiltrada.forEach(cliente =>{
 
         const saldoClass = Number(cliente.saldo || 0) > 0
             ? "saldoDeuda"
             : "saldoOK";
 
-        return `
+        tbody.innerHTML += `
             <tr>
-                <td><strong>${esc(cliente.nombre)}</strong></td>
-                <td>${esc(cliente.direccion || "—")}</td>
-                <td>${esc(cliente.telefono || "—")}</td>
+                <td><strong>${cliente.nombre}</strong></td>
+                <td>${cliente.direccion || "—"}</td>
+                <td>${cliente.telefono || "—"}</td>
                 <td class="${saldoClass}">${dinero(cliente.saldo || 0)}</td>
                 <td class="accionesTabla">
                     <button
                         class="btnAccion btnVer"
                         title="Ver detalle"
-                        onclick="verDetalleCliente('${esc(cliente.id)}')">
+                        onclick="verDetalleCliente('${cliente.id}')">
                         👁️
                     </button>
-                    ${editar ? `
                     <button
                         class="btnAccion btnEditar"
                         title="Editar"
-                        onclick="editarCliente('${esc(cliente.id)}')">
+                        onclick="editarCliente('${cliente.id}')">
                         ✏️
                     </button>
                     <button
                         class="btnAccion btnBorrar"
                         title="Eliminar"
-                        onclick="eliminarCliente('${esc(cliente.id)}')">
+                        onclick="eliminarCliente('${cliente.id}')">
                         🗑️
                     </button>
-                    ` : ""}
                 </td>
             </tr>
         `;
 
-    }).join("");
+    });
 
 }
 
@@ -204,13 +200,7 @@ function abrirModalNuevoCliente(){
         "observacionesCliente"
     );
 
-    const saldo = document.getElementById("saldoCliente");
-
-    saldo.value = 0;
-    saldo.readOnly = false;
-
-    document.getElementById("ayudaSaldoCliente").textContent =
-        "Si ya te debía plata de antes, cargá acá cuánto.";
+    document.getElementById("saldoCliente").value = 0;
 
     abrir("modalCliente");
 
@@ -219,8 +209,6 @@ function abrirModalNuevoCliente(){
 }
 
 function editarCliente(id){
-
-    if(!puede("editarClientes")){ avisarSinPermiso(); return; }
 
     const cliente = clientes.find(c => c.id === id);
 
@@ -233,19 +221,8 @@ function editarCliente(id){
     document.getElementById("nombreCliente").value = cliente.nombre || "";
     document.getElementById("telefonoCliente").value = cliente.telefono || "";
     document.getElementById("direccionCliente").value = cliente.direccion || "";
+    document.getElementById("saldoCliente").value = cliente.saldo || 0;
     document.getElementById("observacionesCliente").value = cliente.observaciones || "";
-
-    const saldo = document.getElementById("saldoCliente");
-
-    saldo.value = cliente.saldo || 0;
-
-    // El saldo se mueve solo con las ventas fiadas y los pagos. Corregirlo
-    // a mano queda reservado al administrador.
-    saldo.readOnly = !esAdmin();
-
-    document.getElementById("ayudaSaldoCliente").textContent = esAdmin()
-        ? "Se actualiza solo con las ventas fiadas y los pagos. Cambialo a mano solo para corregir."
-        : "Se actualiza solo con las ventas fiadas y los pagos (solo el administrador puede corregirlo).";
 
     abrir("modalCliente");
 
@@ -264,56 +241,24 @@ function guardarCliente(){
     }
 
     const telefono = document.getElementById("telefonoCliente").value.trim();
+
     const direccion = document.getElementById("direccionCliente").value.trim();
-    const saldo = numeroDe("saldoCliente");
+
+    const saldo = Number(document.getElementById("saldoCliente").value) || 0;
+
     const observaciones = document.getElementById("observacionesCliente").value.trim();
 
-    const repetido = clientes.find(c =>
-        c.id !== clienteEditandoId
-        && (c.nombre || "").trim().toLowerCase() === nombre.toLowerCase()
-    );
-
-    if(repetido && !guardarCliente.forzar){
-
-        confirmar("Ya existe un cliente llamado \"" + repetido.nombre + "\". ¿Guardar igual?", ()=>{
-
-            guardarCliente.forzar = true;
-
-            try{ guardarCliente(); }finally{ guardarCliente.forzar = false; }
-
-        });
-
-        return;
-
-    }
-
     if(clienteEditandoId){
-
-        if(!puede("editarClientes")){ avisarSinPermiso(); return; }
 
         const cliente = clientes.find(c => c.id === clienteEditandoId);
 
         if(cliente){
 
-            const nombreAnterior = cliente.nombre;
-
             cliente.nombre = nombre;
             cliente.telefono = telefono;
             cliente.direccion = direccion;
+            cliente.saldo = saldo;
             cliente.observaciones = observaciones;
-
-            if(esAdmin()) cliente.saldo = saldo;
-
-            // El nombre nuevo también se refleja en sus ventas anteriores.
-            if(nombreAnterior !== nombre){
-
-                historialVentas.forEach(v =>{
-
-                    if(v.cliente && v.cliente.id === cliente.id) v.cliente.nombre = nombre;
-
-                });
-
-            }
 
             notificacion("Cliente actualizado.");
 
@@ -322,26 +267,26 @@ function guardarCliente(){
     }else{
 
         clientes.push({
-            id: nuevoId("C"),
+
+            id: "C" + Date.now(),
+
             nombre,
             telefono,
             direccion,
             saldo,
-            observaciones,
-            pagos: []
+            observaciones
+
         });
 
         notificacion("Cliente agregado correctamente.");
 
     }
 
-    guardarDatos("clientes", "historialVentas");
+    guardarDatos("clientes");
 
     cerrarModalCliente();
 
     actualizarTablaClientes();
-
-    if(pantallaVisible("pantallaClienteDetalle")) renderClienteDetalle(clienteDetalleActualId);
 
     clienteEditandoId = null;
 
@@ -349,46 +294,40 @@ function guardarCliente(){
 
 function eliminarCliente(id){
 
-    if(!puede("editarClientes")){ avisarSinPermiso(); return; }
-
     const cliente = clientes.find(c => c.id === id);
 
     if(!cliente) return;
 
-    const debe = Number(cliente.saldo || 0) > 0.01
-        ? " Todavía debe " + dinero(cliente.saldo) + "."
-        : "";
-
     confirmar(
-        "¿Eliminar al cliente " + cliente.nombre + "?" + debe
-        + " Sus ventas quedan en el historial.",
+
+        "¿Eliminar al cliente " + cliente.nombre + "?",
+
         ()=>{
-
-            // Se guardan también sus precios especiales, por si se restaura.
-            const copia = JSON.parse(JSON.stringify(cliente));
-
-            copia.preciosEspeciales = obtenerPreciosCliente(id);
 
             clientes = clientes.filter(c => c.id !== id);
 
+            // Se eliminan también los precios personalizados del cliente.
             eliminarPreciosCliente(id);
 
-            if(clienteSeleccionado && clienteSeleccionado.id === id) clienteSeleccionado = null;
-
             registrarEliminacion(
+
                 "Cliente",
+
                 "Cliente " + cliente.nombre
                 + (cliente.telefono ? " · " + cliente.telefono : ""),
-                copia
+
+                cliente
+
             );
 
-            guardarDatos("clientes", "preciosClientes", "eliminaciones");
+            guardarDatos("clientes");
 
             actualizarTablaClientes();
 
             notificacion("Cliente eliminado.", "error");
 
         }
+
     );
 
 }

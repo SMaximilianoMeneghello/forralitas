@@ -16,21 +16,29 @@ function verDetalleMezcla(id){
 
 function abrirPantallaMezclaDetalle(){
 
-    mostrarPantallaDetalle("pantallaMezclaDetalle");
+    const app = document.getElementById("appPrincipal");
+
+    const pantalla = document.getElementById("pantallaMezclaDetalle");
+
+    if(app) app.classList.add("oculto");
+
+    if(pantalla) pantalla.classList.remove("oculto");
 
 }
 
 function cerrarPantallaMezclaDetalle(){
 
-    ocultarPantallaDetalle("pantallaMezclaDetalle");
+    const app = document.getElementById("appPrincipal");
 
-    if(paginaActual === "Mezclas") actualizarTablaMezclas();
+    const pantalla = document.getElementById("pantallaMezclaDetalle");
 
-}
+    if(app && app.classList.contains("oculto")){
 
-function unidadIngrediente(unidad){
+        app.classList.remove("oculto");
 
-    return unidad === "kg" ? "kg" : "bolsas";
+    }
+
+    if(pantalla) pantalla.classList.add("oculto");
 
 }
 
@@ -40,10 +48,8 @@ function renderMezclaDetalle(id){
 
     if(!mezcla){
 
-        document.getElementById("tituloMezclaDetalle").textContent = "Mezcla";
-
         document.getElementById("contenidoMezclaDetalle").innerHTML = `
-            <div class="card"><p>Mezcla no encontrada (puede que la hayan eliminado).</p></div>
+            <div class="card"><p>Mezcla no encontrada.</p></div>
         `;
 
         return;
@@ -52,16 +58,12 @@ function renderMezclaDetalle(id){
 
     if(!mezcla.producciones) mezcla.producciones = [];
 
-    const ingredientes = mezcla.ingredientes || [];
+    document.getElementById("tituloMezclaDetalle").textContent = mezcla.nombre;
 
-    const nombreSalida = (mezcla.productoSalida && mezcla.productoSalida.nombre) || "—";
-
-    document.getElementById("tituloMezclaDetalle").textContent = mezcla.nombre || "Mezcla";
-
-    const resumenIngredientes = ingredientes.map(i => `
+    const resumenIngredientes = mezcla.ingredientes.map(i => `
         <div class="datoCliente">
-            <span class="labelDato">${esc(i.nombre)}</span>
-            <span class="valorDato">${formatearStock(i.cantidad)} ${unidadIngrediente(i.unidad)} por lote</span>
+            <span class="labelDato">${i.nombre}</span>
+            <span class="valorDato">${formatearStock(i.cantidad)} ${i.unidad === "kg" ? "kg" : "bolsas"} por lote</span>
         </div>
     `).join("");
 
@@ -79,7 +81,7 @@ function renderMezclaDetalle(id){
 
                     <div class="datoCliente">
                         <span class="labelDato">Producto de salida</span>
-                        <span class="valorDato">${esc(nombreSalida)}</span>
+                        <span class="valorDato">${mezcla.productoSalida.nombre}</span>
                     </div>
 
                     <div class="datoCliente">
@@ -95,7 +97,7 @@ function renderMezclaDetalle(id){
                     ${mezcla.notas ? `
                         <div class="datoCliente">
                             <span class="labelDato">Notas</span>
-                            <span class="valorDato">${esc(mezcla.notas)}</span>
+                            <span class="valorDato">${mezcla.notas}</span>
                         </div>
                     ` : ""}
 
@@ -139,8 +141,6 @@ function renderHistorialProduccionMezcla(mezcla){
 
     const producciones = mezcla.producciones || [];
 
-    const nombreSalida = (mezcla.productoSalida && mezcla.productoSalida.nombre) || "";
-
     if(producciones.length === 0){
 
         return `<div class="cardVentaHistorial"><p class="tablaVacia">Todavía no se registró ninguna producción.</p></div>`;
@@ -153,21 +153,15 @@ function renderHistorialProduccionMezcla(mezcla){
             <div class="cardVentaHistorial">
                 <div class="cabeceraVentaHistorial">
                     <div>
-                        <span class="fechaVenta">🗓️ ${esc(p.fechaTexto)}</span>
-                        ${p.usuario ? `<span class="vendedorVenta">👤 ${esc(p.usuario)}</span>` : ""}
+                        <span class="fechaVenta">🗓️ ${p.fechaTexto}</span>
+                        ${p.usuario ? `<span class="vendedorVenta">👤 ${p.usuario}</span>` : ""}
                     </div>
-                    ${esAdmin() ? `
-                        <span class="accionesVenta">
-                            <button class="btnAccion btnBorrar" title="Anular esta producción (devuelve el stock)"
-                                onclick="eliminarProduccionMezcla('${esc(mezcla.id)}', '${esc(p.id)}')">🗑️</button>
-                        </span>
-                    ` : ""}
                 </div>
                 <div class="datosVentaHistorial">
-                    <span>Se descontó: ${esc(p.ingredientesUsados)}</span>
+                    <span>Se descontó: ${p.ingredientesUsados}</span>
                 </div>
                 <div class="totalVentaHistorial">
-                    +${formatearStock(p.cantidad)} bolsas de ${esc(nombreSalida)}
+                    +${formatearStock(p.cantidad)} bolsas de ${mezcla.productoSalida.nombre}
                 </div>
             </div>
         `).join("");
@@ -180,44 +174,7 @@ function renderHistorialProduccionMezcla(mezcla){
 
 let mezclaProduccionActualId = null;
 
-/* Cuánto hay que descontar de cada ingrediente para producir
-   "cantidad" bolsas. Devuelve null si falta algún producto. */
-function calcularConsumoMezcla(mezcla, cantidad){
-
-    const multiplicador = cantidad / Number(mezcla.bolsasPorLote || 10);
-
-    const detalle = [];
-
-    for(const ing of (mezcla.ingredientes || [])){
-
-        const producto = productos.find(p => p.id === ing.idProducto);
-
-        const cantidadNecesaria = redondear(Number(ing.cantidad || 0) * multiplicador);
-
-        const bolsas = !producto
-            ? 0
-            : (ing.unidad === "kg"
-                ? (Number(producto.pesoBolsa) > 0 ? cantidadNecesaria / Number(producto.pesoBolsa) : 0)
-                : cantidadNecesaria);
-
-        detalle.push({
-            producto: producto || null,
-            idProducto: ing.idProducto,
-            nombre: ing.nombre,
-            unidad: ing.unidad,
-            cantidadNecesaria,
-            bolsas: redondear(bolsas)
-        });
-
-    }
-
-    return detalle;
-
-}
-
 function abrirModalProduccionMezcla(id){
-
-    if(!puede("mezclas")){ avisarSinPermiso(); return; }
 
     mezclaProduccionActualId = id;
 
@@ -225,17 +182,9 @@ function abrirModalProduccionMezcla(id){
 
     if(!mezcla) return;
 
-    const input = document.getElementById("cantidadProduccionMezcla");
+    document.getElementById("cantidadProduccionMezcla").value = mezcla.bolsasPorLote || 10;
 
-    input.value = mezcla.bolsasPorLote || 10;
-
-    input.oninput = ()=>{
-
-        limpiarNumero(input);
-
-        actualizarPreviaProduccionMezcla();
-
-    };
+    document.getElementById("cantidadProduccionMezcla").oninput = actualizarPreviaProduccionMezcla;
 
     actualizarPreviaProduccionMezcla();
 
@@ -249,7 +198,9 @@ function actualizarPreviaProduccionMezcla(){
 
     if(!mezcla) return;
 
-    const cantidad = numeroDe("cantidadProduccionMezcla");
+    const cantidad = Number(document.getElementById("cantidadProduccionMezcla").value) || 0;
+
+    const multiplicador = cantidad / Number(mezcla.bolsasPorLote || 10);
 
     const cont = document.getElementById("previaIngredientesProduccion");
 
@@ -263,17 +214,22 @@ function actualizarPreviaProduccionMezcla(){
 
     cont.innerHTML = `
         <p class="labelDato" style="margin-bottom:8px">Esto va a descontar:</p>
-        ${calcularConsumoMezcla(mezcla, cantidad).map(det =>{
+        ${mezcla.ingredientes.map(i =>{
 
-            const falta = !det.producto
-                ? " ⚠ el producto ya no existe"
-                : (det.bolsas > Number(det.producto.stock || 0) + 0.0001 ? " ⚠ sin stock suficiente" : "");
+            const aDescontar = i.cantidad * multiplicador;
+
+            const producto = productos.find(p => p.id === i.idProducto);
+
+            const sinStock = producto && (i.unidad === "kg"
+                ? (Number(producto.pesoBolsa) > 0 ? aDescontar / Number(producto.pesoBolsa) : 0)
+                : aDescontar) > Number(producto.stock || 0);
 
             return `
                 <div class="datoCliente">
-                    <span class="labelDato">${esc(det.nombre)}</span>
-                    <span class="valorDato ${falta ? "saldoDeuda" : ""}">
-                        ${formatearStock(det.cantidadNecesaria)} ${unidadIngrediente(det.unidad)}${falta}
+                    <span class="labelDato">${i.nombre}</span>
+                    <span class="valorDato ${sinStock ? "saldoDeuda" : ""}">
+                        ${formatearStock(aDescontar)} ${i.unidad === "kg" ? "kg" : "bolsas"}
+                        ${sinStock ? " ⚠ sin stock suficiente" : ""}
                     </span>
                 </div>
             `;
@@ -285,13 +241,11 @@ function actualizarPreviaProduccionMezcla(){
 
 function guardarProduccionMezcla(){
 
-    if(!puede("mezclas")){ avisarSinPermiso(); return; }
-
     const mezcla = mezclas.find(m => m.id === mezclaProduccionActualId);
 
     if(!mezcla) return;
 
-    const cantidad = numeroDe("cantidadProduccionMezcla");
+    const cantidad = Number(document.getElementById("cantidadProduccionMezcla").value) || 0;
 
     if(cantidad <= 0){
 
@@ -301,145 +255,88 @@ function guardarProduccionMezcla(){
 
     }
 
-    const productoSalida = mezcla.productoSalida
-        ? productos.find(p => p.id === mezcla.productoSalida.id)
-        : null;
-
-    if(!productoSalida){
-
-        notificacion("El producto de salida de esta receta ya no existe en Productos. Editá la receta y elegilo de nuevo.", "error");
-
-        return;
-
-    }
+    const multiplicador = cantidad / Number(mezcla.bolsasPorLote || 10);
 
     // Se valida el stock de TODOS los ingredientes antes de descontar
     // ninguno, para no dejar todo a mitad de camino.
-    const detalle = calcularConsumoMezcla(mezcla, cantidad);
+    const detalle = [];
 
-    for(const det of detalle){
+    for(const ing of mezcla.ingredientes){
 
-        if(!det.producto){
+        const producto = productos.find(p => p.id === ing.idProducto);
 
-            notificacion("El ingrediente \"" + det.nombre + "\" ya no existe en Productos.", "error");
+        if(!producto){
+
+            notificacion("El ingrediente \"" + ing.nombre + "\" ya no existe en Productos.", "error");
 
             return;
 
         }
 
-        if(det.bolsas > Number(det.producto.stock || 0) + 0.0001){
+        const cantidadNecesaria = ing.cantidad * multiplicador;
+
+        const bolsasADescontar = ing.unidad === "kg"
+            ? (Number(producto.pesoBolsa) > 0 ? cantidadNecesaria / Number(producto.pesoBolsa) : 0)
+            : cantidadNecesaria;
+
+        if(bolsasADescontar > Number(producto.stock || 0)){
 
             notificacion(
-                "No hay stock suficiente de " + det.producto.nombre
-                + ". Disponible: " + formatearStock(det.producto.stock) + " bolsas.",
+
+                "No hay stock suficiente de " + producto.nombre
+                + ". Disponible: " + formatearStock(producto.stock) + " bolsas.",
+
                 "error"
+
             );
 
             return;
 
         }
+
+        detalle.push({ producto, cantidadNecesaria, unidad: ing.unidad, bolsasADescontar, nombre: ing.nombre });
 
     }
 
     detalle.forEach(det =>{
 
-        det.producto.stock = redondear(Number(det.producto.stock || 0) - det.bolsas);
+        det.producto.stock = Number(det.producto.stock || 0) - det.bolsasADescontar;
 
     });
 
-    productoSalida.stock = redondear(Number(productoSalida.stock || 0) + cantidad);
+    const productoSalida = productos.find(p => p.id === mezcla.productoSalida.id);
+
+    if(productoSalida){
+
+        productoSalida.stock = Number(productoSalida.stock || 0) + cantidad;
+
+    }
 
     const ingredientesUsados = detalle
-        .map(det => formatearStock(det.cantidadNecesaria) + " " + unidadIngrediente(det.unidad) + " de " + det.nombre)
+        .map(det => formatearStock(det.cantidadNecesaria) + " " + (det.unidad === "kg" ? "kg" : "bolsas") + " de " + det.nombre)
         .join(", ");
 
     if(!mezcla.producciones) mezcla.producciones = [];
 
-    const ahora = new Date();
-
     mezcla.producciones.unshift({
 
-        id: nuevoId("PM"),
-        fecha: ahora.toISOString(),
-        fechaTexto: fechaHoraTexto(ahora),
+        id: "PM" + Date.now(),
+        fecha: new Date().toISOString(),
+        fechaTexto: fechaHoraTexto(new Date()),
         cantidad,
         ingredientesUsados,
-        usuario: usuarioActual ? usuarioActual.nombre : null,
-
-        // Se guarda exactamente qué stock se movió, para poder anularla.
-        salidaId: productoSalida.id,
-        consumo: detalle.map(det => ({ idProducto: det.idProducto, bolsas: det.bolsas }))
+        usuario: usuarioActual ? usuarioActual.nombre : null
 
     });
 
-    guardarDatos("mezclas", "productos");
+    guardarDatos("productos", "mezclas");
 
     cerrar("modalProduccionMezcla");
 
     renderMezclaDetalle(mezcla.id);
 
+    actualizarTablaMezclas();
+
     notificacion("Producción registrada. Se actualizó el stock.");
-
-}
-
-/* ==========================================
-   ANULAR UNA PRODUCCIÓN (SOLO ADMIN)
-   Devuelve el stock de los ingredientes y
-   descuenta las bolsas producidas.
-========================================== */
-
-function eliminarProduccionMezcla(mezclaId, produccionId){
-
-    if(!soloAdmin()) return;
-
-    const mezcla = mezclas.find(m => m.id === mezclaId);
-
-    const produccion = mezcla ? (mezcla.producciones || []).find(p => p.id === produccionId) : null;
-
-    if(!produccion) return;
-
-    // Las producciones cargadas con versiones anteriores no guardaban
-    // el detalle: se calcula con la receta actual.
-    const consumo = Array.isArray(produccion.consumo)
-        ? produccion.consumo
-        : calcularConsumoMezcla(mezcla, Number(produccion.cantidad || 0))
-            .map(det => ({ idProducto: det.idProducto, bolsas: det.bolsas }));
-
-    const salidaId = produccion.salidaId || (mezcla.productoSalida && mezcla.productoSalida.id);
-
-    confirmar(
-        "¿Anular la producción del " + produccion.fechaTexto + " (" + formatearStock(produccion.cantidad) + " bolsas)? "
-        + "Se devuelve el stock de los ingredientes y se descuentan las bolsas producidas"
-        + (Array.isArray(produccion.consumo) ? "." : " (calculado con la receta actual)."),
-        ()=>{
-
-            consumo.forEach(c =>{
-
-                const producto = productos.find(p => p.id === c.idProducto);
-
-                if(producto) producto.stock = redondear(Number(producto.stock || 0) + Number(c.bolsas || 0));
-
-            });
-
-            const salida = productos.find(p => p.id === salidaId);
-
-            if(salida) salida.stock = redondear(Number(salida.stock || 0) - Number(produccion.cantidad || 0));
-
-            mezcla.producciones = mezcla.producciones.filter(p => p.id !== produccionId);
-
-            registrarEliminacion(
-                "Producción de mezcla",
-                "Producción de " + (mezcla.nombre || "") + " · " + formatearStock(produccion.cantidad) + " bolsas · " + produccion.fechaTexto,
-                produccion
-            );
-
-            guardarDatos("mezclas", "productos", "eliminaciones");
-
-            renderMezclaDetalle(mezcla.id);
-
-            notificacion("Producción anulada. Se devolvió el stock.", "error");
-
-        }
-    );
 
 }

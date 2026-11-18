@@ -6,6 +6,42 @@ let modoVenta = "bolsa";
 let metodoPago = "efectivo";
 let productoVenta = null;
 
+// Índice resaltado (con las flechitas) en la lista de sugerencias del
+// buscador de productos de Ventas. -1 = nada resaltado todavía.
+let indiceSugerenciaVenta = -1;
+
+// Caché de la configuración de Mercado Pago Point (token/dispositivo
+// guardados en el proceso main de Electron). Se carga una vez al entrar
+// a Ventas; "tieneToken" y "deviceId" deciden si se muestra el botón
+// de cobro automático.
+let mpConfigCache = { tieneToken: false, deviceId: "" };
+
+// Cobro en curso contra el Point Smart (para el polling y para poder
+// cancelarlo desde el modal de espera).
+let ordenPointSmartActual = null;
+let intervaloPointSmart = null;
+
+// Monitor de transferencias/QR de Mercado Pago (no usa el Point: lee
+// los últimos pagos acreditados en la cuenta por la API de Pagos).
+// "transferenciaEsperada" es la venta en curso que está esperando una
+// transferencia puntual; si es null el monitor solo avisa, no registra
+// ninguna venta sola.
+let intervaloTransferenciasMP = null;
+let desdeMonitorTransferenciasMP = null;
+let transferenciaEsperada = null;
+
+// Búsqueda sin importar mayúsculas ni acentos ("maiz" encuentra "Maíz").
+function normalizarBusqueda(texto){
+
+    return (texto || "")
+        .toString()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .trim();
+
+}
+
 let estadoVenta = "paga";
 
 function renderVentas(){
@@ -36,22 +72,40 @@ function renderVentas(){
                         type="button"
                         class="btnQuitarCliente"
                         onclick="limpiarClienteVenta()">
+
                         ✕
+
                     </button>
 
                 </div>
-
                 <div class="saldoClienteVenta">
-                    Saldo actual:
-                    <strong id="saldoClienteVenta">$0</strong>
-                </div>
 
-                <div class="estadoVenta">
-                    <span>Estado</span>
-                    <button id="btnPaga" class="estadoActivo">PAGA</button>
-                    <button id="btnDebe">DEBE</button>
-                </div>
+    Saldo actual:
 
+    <strong id="saldoClienteVenta">
+
+        $0
+
+    </strong>
+
+</div>
+<div class="estadoVenta">
+
+    <span>Estado</span>
+
+    <button id="btnPaga" class="estadoActivo">
+
+        PAGA
+
+    </button>
+
+    <button id="btnDebe">
+
+        DEBE
+
+    </button>
+
+</div>
             </div>
 
             <div class="busquedaVenta">
@@ -69,9 +123,29 @@ function renderVentas(){
             </div>
 
             <div class="modoVenta">
-                <button id="modoBolsa" class="modoActivo">Bolsa</button>
-                <button id="modoKg">Kg</button>
-                <button id="modoDinero">$</button>
+
+                <button
+                    id="modoBolsa"
+                    class="modoActivo">
+
+                    Bolsa
+
+                </button>
+
+                <button
+                    id="modoKg">
+
+                    Kg
+
+                </button>
+
+                <button
+                    id="modoDinero">
+
+                    $
+
+                </button>
+
             </div>
 
         </div>
@@ -81,17 +155,28 @@ function renderVentas(){
             <table>
 
                 <thead>
+
                     <tr>
+
                         <th>Producto</th>
+
                         <th>Cantidad</th>
+
                         <th>Unidad</th>
+
                         <th>Precio Unit.</th>
+
                         <th>Subtotal</th>
+
                         <th>Acción</th>
+
                     </tr>
+
                 </thead>
 
-                <tbody id="tablaVenta"></tbody>
+                <tbody id="tablaVenta">
+
+                </tbody>
 
             </table>
 
@@ -100,44 +185,97 @@ function renderVentas(){
         <div class="pieVenta">
 
             <div class="totalVenta">
+
                 <small>TOTAL</small>
+
                 <h2 id="totalVenta">$0</h2>
+
             </div>
 
             <div class="formasPago">
 
-                <button id="btnEfectivo" class="activo">Efectivo</button>
-                <button id="btnTransferencia">Transferencia</button>
-                <button id="btnMixto">Mixto</button>
+                <button
+                    id="btnEfectivo"
+                    class="activo">
 
-                <div id="pagoMixto" class="pagoMixto">
+                    Efectivo
+
+                </button>
+
+                <button
+                    id="btnTransferencia">
+
+                    Transferencia/QR
+
+                </button>
+
+                <button
+                    id="btnTarjeta">
+
+                    Tarjeta
+
+                </button>
+
+                <button
+                    id="btnMixto">
+
+                    Mixto
+
+                </button>
+
+                <div
+                    id="pagoMixto"
+                    class="pagoMixto">
 
                     <div>
+
                         <label>Efectivo</label>
+
                         <input
                             id="montoEfectivo"
                             type="text"
                             inputmode="decimal"
                             autocomplete="off"
-                            oninput="limpiarNumero(this)">
+                            oninput="limpiarNumero(this); renderAccionPointSmart()">
+
                     </div>
 
                     <div>
-                        <label>Transferencia</label>
+
+                        <label>Resto (transferencia/tarjeta)</label>
+
                         <input
                             id="montoTransferencia"
                             type="text"
                             inputmode="decimal"
                             autocomplete="off"
-                            oninput="limpiarNumero(this)">
+                            oninput="limpiarNumero(this); renderAccionPointSmart()">
+
+                    </div>
+
+                    <div>
+
+                        <label>Medio del resto</label>
+
+                        <select id="tipoElectronicoMixto" onchange="renderAccionPointSmart()">
+                            <option value="transferencia">Transferencia/QR</option>
+                            <option value="tarjeta">Tarjeta</option>
+                        </select>
+
                     </div>
 
                 </div>
 
+                <div id="accionPointSmart" class="accionPointSmart"></div>
+
             </div>
 
-            <button id="btnRegistrarVenta" class="btnGuardar">
+            <button
+                id="btnRegistrarVenta"
+                class="btnGuardar">
+
                 Registrar venta
+
             </button>
 
         </div>
@@ -150,23 +288,6 @@ function renderVentas(){
 
 }
 
-/* Llega un cambio de otra PC mientras se está vendiendo: se
-   actualizan los datos sin tocar lo que el vendedor ya eligió
-   (modo, forma de pago, PAGA/DEBE, montos escritos). */
-function refrescarVentas(){
-
-    if(!document.getElementById("tablaVenta")) return;
-
-    actualizarTablaVenta();
-
-    actualizarClienteVentaUI();
-
-    const buscar = document.getElementById("buscarVenta");
-
-    if(buscar && buscar.value.trim() !== "") buscarProductosVenta();
-
-}
-
 function iniciarEventosVenta(){
 
     const buscarVenta = document.getElementById("buscarVenta");
@@ -176,11 +297,41 @@ function iniciarEventosVenta(){
 
     buscarVenta.addEventListener("keydown", (e)=>{
 
+        if(e.key === "ArrowDown" || e.key === "ArrowUp"){
+
+            const items = document.querySelectorAll("#listaProductosVenta .itemBusquedaProducto");
+
+            if(items.length === 0) return;
+
+            e.preventDefault();
+
+            const siguiente = indiceSugerenciaVenta + (e.key === "ArrowDown" ? 1 : -1);
+
+            indiceSugerenciaVenta = Math.max(0, Math.min(items.length - 1, siguiente));
+
+            resaltarSugerenciaVenta(items);
+
+            return;
+
+        }
+
         if(e.key !== "Enter") return;
 
         e.preventDefault();
 
-        const texto = e.target.value.trim().toLowerCase();
+        // Hay una sugerencia resaltada con las flechitas: esa es la que
+        // se agrega, sin importar si hay otro match "mejor" en la lista.
+        const items = document.querySelectorAll("#listaProductosVenta .itemBusquedaProducto");
+
+        if(indiceSugerenciaVenta >= 0 && items[indiceSugerenciaVenta]){
+
+            seleccionarProductoVenta(items[indiceSugerenciaVenta].dataset.id);
+
+            return;
+
+        }
+
+        const texto = normalizarBusqueda(e.target.value);
 
         // Buscador vacío: se registra la venta directamente.
         if(texto === ""){
@@ -191,7 +342,13 @@ function iniciarEventosVenta(){
 
         }
 
-        const producto = productos.find(p => coincideProducto(p, texto));
+        const producto = productos.find(p=>
+
+            normalizarBusqueda(p.nombre).includes(texto)
+
+            || normalizarBusqueda(p.id).includes(texto)
+
+        );
 
         if(producto){
 
@@ -211,11 +368,15 @@ function iniciarEventosVenta(){
 
         if(e.key !== "Enter") return;
 
-        const texto = e.target.value.trim().toLowerCase();
+        const texto = e.target.value.toLowerCase();
 
-        if(texto === "") return;
+        const cliente = clientes.find(c=>
 
-        const cliente = clientes.find(c => coincideCliente(c, texto));
+            c.nombre.toLowerCase().includes(texto)
+
+            || (c.telefono || "").includes(texto)
+
+        );
 
         if(cliente){
 
@@ -231,9 +392,10 @@ function iniciarEventosVenta(){
     document.getElementById("modoDinero").onclick = () => cambiarModoVenta("dinero");
     document.getElementById("btnEfectivo").onclick = () => cambiarMetodoPago("efectivo");
     document.getElementById("btnTransferencia").onclick = () => cambiarMetodoPago("transferencia");
+    document.getElementById("btnTarjeta").onclick = () => cambiarMetodoPago("tarjeta");
     document.getElementById("btnMixto").onclick = () => cambiarMetodoPago("mixto");
     document.getElementById("btnPaga").onclick = () => cambiarEstadoVenta("paga");
-    document.getElementById("btnDebe").onclick = () => cambiarEstadoVenta("debe");
+    document.getElementById("btnDebe").onclick = () => cambiarEstadoVenta("debe"); 
 
     const montoEfectivo = document.getElementById("montoEfectivo");
     const montoTransferencia = document.getElementById("montoTransferencia");
@@ -272,20 +434,26 @@ function iniciarEventosVenta(){
     cambiarModoVenta("bolsa");
     cambiarMetodoPago("efectivo");
     cambiarEstadoVenta("paga");
-
+    cargarConfigMP();
 }
 
-function coincideProducto(p, texto){
+// Trae del proceso main si ya hay un Access Token / dispositivo Point
+// configurados, para decidir si se muestra el cobro automático.
+async function cargarConfigMP(){
 
-    return (p.nombre || "").toLowerCase().includes(texto)
-        || (p.id || "").toLowerCase().includes(texto);
+    if(!window.forralitasNative) return;
 
-}
+    try{
 
-function coincideCliente(c, texto){
+        mpConfigCache = await window.forralitasNative.mp.obtenerConfig();
 
-    return (c.nombre || "").toLowerCase().includes(texto)
-        || (c.telefono || "").toLowerCase().includes(texto);
+    }catch{
+
+        mpConfigCache = { tieneToken: false, deviceId: "" };
+
+    }
+
+    renderAccionPointSmart();
 
 }
 
@@ -295,12 +463,20 @@ function manejarEnterGlobalVenta(e){
 
     if(paginaActual !== "Ventas") return;
 
-    if(!document.getElementById("btnRegistrarVenta")) return;
-
     // Si hay un modal abierto, lo maneja el modal.
     if(document.querySelector(".modal:not(.oculto)")) return;
 
     const activo = document.activeElement;
+
+    // Estos campos tienen su propio manejo de Enter.
+    const propios = [
+        "buscarVenta",
+        "buscarClienteVenta",
+        "montoEfectivo",
+        "montoTransferencia"
+    ];
+
+    if(activo && propios.includes(activo.id)) return;
 
     // Los botones e inputs manejan Enter por su cuenta (evita doble acción).
     if(activo){
@@ -329,11 +505,23 @@ function cambiarModoVenta(modo){
         .querySelectorAll(".modoVenta button")
         .forEach(b => b.classList.remove("modoActivo"));
 
-    const ids = { bolsa: "modoBolsa", kg: "modoKg", dinero: "modoDinero" };
+    if(modo === "bolsa"){
 
-    const boton = document.getElementById(ids[modo]);
+        document.getElementById("modoBolsa").classList.add("modoActivo");
 
-    if(boton) boton.classList.add("modoActivo");
+    }
+
+    if(modo === "kg"){
+
+        document.getElementById("modoKg").classList.add("modoActivo");
+
+    }
+
+    if(modo === "dinero"){
+
+        document.getElementById("modoDinero").classList.add("modoActivo");
+
+    }
 
 }
 
@@ -341,12 +529,34 @@ function cambiarMetodoPago(tipo){
 
     metodoPago = tipo;
 
-    document.getElementById("btnEfectivo").classList.toggle("activo", tipo === "efectivo");
-    document.getElementById("btnTransferencia").classList.toggle("activo", tipo === "transferencia");
-    document.getElementById("btnMixto").classList.toggle("activo", tipo === "mixto");
-    document.getElementById("pagoMixto").classList.toggle("activo", tipo === "mixto");
+    document.getElementById("btnEfectivo").classList.remove("activo");
+    document.getElementById("btnTransferencia").classList.remove("activo");
+    document.getElementById("btnTarjeta").classList.remove("activo");
+    document.getElementById("btnMixto").classList.remove("activo");
+    document.getElementById("pagoMixto").classList.remove("activo");
+
+    if(tipo === "efectivo"){
+
+        document.getElementById("btnEfectivo").classList.add("activo");
+
+    }
+
+    if(tipo === "transferencia"){
+
+        document.getElementById("btnTransferencia").classList.add("activo");
+
+    }
+
+    if(tipo === "tarjeta"){
+
+        document.getElementById("btnTarjeta").classList.add("activo");
+
+    }
 
     if(tipo === "mixto"){
+
+        document.getElementById("btnMixto").classList.add("activo");
+        document.getElementById("pagoMixto").classList.add("activo");
 
         // Se abren los inputs y el cursor queda listo para escribir los montos.
         const montoEfectivo = document.getElementById("montoEfectivo");
@@ -364,17 +574,29 @@ function cambiarMetodoPago(tipo){
 
     }
 
-}
+    renderAccionPointSmart();
 
+}
 function cambiarEstadoVenta(tipo){
 
     estadoVenta = tipo;
 
-    document.getElementById("btnPaga").classList.toggle("estadoActivo", tipo === "paga");
-    document.getElementById("btnDebe").classList.toggle("estadoActivo", tipo !== "paga");
+    document.getElementById("btnPaga").classList.remove("estadoActivo");
+    document.getElementById("btnDebe").classList.remove("estadoActivo");
+
+    if(tipo === "paga"){
+
+        document.getElementById("btnPaga").classList.add("estadoActivo");
+
+    }else{
+
+        document.getElementById("btnDebe").classList.add("estadoActivo");
+
+    }
+
+    renderAccionPointSmart();
 
 }
-
 /* ==========================================
    CLIENTES EN VENTA
 ========================================== */
@@ -384,7 +606,6 @@ function buscarClientesVenta(){
     const texto = document
         .getElementById("buscarClienteVenta")
         .value
-        .trim()
         .toLowerCase();
 
     const lista = document.getElementById("listaClientesVenta");
@@ -393,29 +614,57 @@ function buscarClientesVenta(){
 
     if(texto === "") return;
 
-    const encontrados = clientes.filter(c => coincideCliente(c, texto));
+    const encontrados = clientes.filter(cliente=>{
+
+        return (
+
+            cliente.nombre.toLowerCase().includes(texto)
+
+            || (cliente.telefono || "").includes(texto)
+
+        );
+
+    });
 
     if(encontrados.length === 0){
 
         lista.innerHTML = `
+
             <div class="itemBusquedaVacio">
+
                 No se encontraron clientes.
+
             </div>
+
         `;
 
         return;
 
     }
 
-    lista.innerHTML = encontrados.slice(0, 30).map(cliente => `
-        <div
-            class="itemBusquedaProducto"
-            onclick="seleccionarClienteVenta('${esc(cliente.id)}')">
-            <strong>${esc(cliente.nombre)}</strong>
-            <br>
-            <small>${esc(cliente.telefono || "Sin teléfono")}</small>
-        </div>
-    `).join("");
+    encontrados.forEach(cliente=>{
+
+        lista.innerHTML += `
+
+            <div
+                class="itemBusquedaProducto"
+                onclick="seleccionarClienteVenta('${cliente.id}')">
+
+                <strong>${cliente.nombre}</strong>
+
+                <br>
+
+                <small>
+
+                    ${cliente.telefono || "Sin teléfono"}
+
+                </small>
+
+            </div>
+
+        `;
+
+    });
 
 }
 
@@ -428,19 +677,12 @@ function seleccionarClienteVenta(id){
 
     actualizarClienteVentaUI();
 
-    recalcularCarritoConPrecios();
-
 }
 
 function limpiarClienteVenta(){
 
     clienteSeleccionado = null;
-
     actualizarClienteVentaUI();
-
-    cambiarEstadoVenta("paga");
-
-    recalcularCarritoConPrecios();
 
 }
 
@@ -450,33 +692,32 @@ function actualizarClienteVentaUI(){
     const nombre = document.getElementById("nombreClienteSeleccionado");
     const saldo = document.getElementById("saldoClienteVenta");
 
-    if(!contenedor || !nombre || !saldo) return;
-
-    const saldoBox = document.querySelector(".saldoClienteVenta");
-    const estado = document.querySelector(".estadoVenta");
+    const saldoBox=document.querySelector(".saldoClienteVenta");
+    const estado=document.querySelector(".estadoVenta");
 
     if(clienteSeleccionado){
 
         contenedor.classList.remove("oculto");
 
-        if(saldoBox) saldoBox.style.display = "block";
-        if(estado) estado.style.display = "flex";
+        if(saldoBox) saldoBox.style.display="block";
+        if(estado) estado.style.display="flex";
 
-        nombre.textContent = "👤 " + clienteSeleccionado.nombre;
+        nombre.textContent="👤 "+clienteSeleccionado.nombre;
 
-        saldo.textContent = dinero(clienteSeleccionado.saldo || 0);
+        saldo.textContent=dinero(clienteSeleccionado.saldo||0);
 
     }else{
 
         contenedor.classList.add("oculto");
 
-        if(saldoBox) saldoBox.style.display = "none";
-        if(estado) estado.style.display = "none";
+        if(saldoBox) saldoBox.style.display="none";
+        if(estado) estado.style.display="none";
 
-        nombre.textContent = "";
-        saldo.textContent = "$0";
-
+        nombre.textContent="";
+        saldo.textContent="$0";
     }
+
+    renderAccionPointSmart();
 
 }
 
@@ -484,41 +725,37 @@ function actualizarClienteVentaUI(){
    PRECIOS
 ========================================= */
 
-/* Precio que le corresponde a un cliente (si tiene un precio
-   especial cargado para ese producto) o el precio de lista. */
-function preciosProductoPara(producto, clienteId){
+function obtenerPreciosProducto(producto){
 
-    let especial = null;
+    const preciosClientes = obtenerTodosPreciosCliente();
 
-    if(clienteId){
+    if(!clienteSeleccionado){
 
-        especial = obtenerTodosPreciosCliente().find(p =>
-            p.clienteId === clienteId && p.productoId === producto.id
-        ) || null;
+        return {
+            precioBolsa: producto.precioBolsa,
+            precioKg: producto.precioKg
+        };
 
     }
 
-    const elegir = (propio, general) =>
-        (propio !== undefined && propio !== null && Number(propio) > 0) ? Number(propio) : Number(general || 0);
+    const especial = preciosClientes.find(p =>
+
+        p.clienteId === clienteSeleccionado.id
+
+        && p.productoId === producto.id
+
+    );
 
     return {
-        precioBolsa: elegir(especial ? especial.precioBolsa : null, producto.precioBolsa),
-        precioKg: elegir(especial ? especial.precioKg : null, producto.precioKg)
+        precioBolsa: especial?.precioBolsa ?? producto.precioBolsa,
+        precioKg: especial?.precioKg ?? producto.precioKg
     };
 
 }
 
-function obtenerPreciosProducto(producto){
+function calcularLineaVenta(producto, cantidad, modo){
 
-    return preciosProductoPara(producto, clienteSeleccionado ? clienteSeleccionado.id : null);
-
-}
-
-/* Calcula una línea de venta. "precios" = { precioBolsa, precioKg }
-   y "pesoBolsa" = kilos que trae una bolsa del producto. */
-function calcularLinea(precios, pesoBolsa, cantidad, modo){
-
-    const peso = Number(pesoBolsa || 0);
+    const precios = obtenerPreciosProducto(producto);
 
     let precio = 0;
     let subtotal = 0;
@@ -530,13 +767,13 @@ function calcularLinea(precios, pesoBolsa, cantidad, modo){
         precio = precios.precioBolsa;
         subtotal = cantidad * precios.precioBolsa;
         bolsas = cantidad;
-        kg = cantidad * peso;
+        kg = cantidad * producto.pesoBolsa;
 
     }else if(modo === "kg"){
 
         precio = precios.precioKg;
         subtotal = cantidad * precios.precioKg;
-        bolsas = peso > 0 ? cantidad / peso : 0;
+        bolsas = cantidad / producto.pesoBolsa;
         kg = cantidad;
 
     }else{
@@ -545,22 +782,11 @@ function calcularLinea(precios, pesoBolsa, cantidad, modo){
         precio = precios.precioKg;
         subtotal = cantidad;
         kg = precios.precioKg > 0 ? cantidad / precios.precioKg : 0;
-        bolsas = peso > 0 ? kg / peso : 0;
+        bolsas = producto.pesoBolsa > 0 ? kg / producto.pesoBolsa : 0;
 
     }
 
-    return {
-        precio: Number(precio || 0),
-        subtotal: redondear(subtotal, 2),
-        bolsas: redondear(bolsas),
-        kg: redondear(kg)
-    };
-
-}
-
-function calcularLineaVenta(producto, cantidad, modo){
-
-    return calcularLinea(obtenerPreciosProducto(producto), producto.pesoBolsa, cantidad, modo);
+    return { precio, subtotal, bolsas, kg };
 
 }
 
@@ -580,53 +806,6 @@ function formatearCantidadItem(item){
 
 }
 
-/* Al elegir o quitar el cliente, los productos ya cargados pasan
-   a tener el precio que le corresponde (lista o especial). */
-function recalcularCarritoConPrecios(){
-
-    let cambio = false;
-
-    carrito.forEach(item =>{
-
-        const producto = productos.find(p => p.id === item.id);
-
-        if(!producto) return;
-
-        const linea = calcularLineaVenta(producto, item.cantidad, item.modo);
-
-        // En modo "$" el monto no cambia, pero sí los kilos a pesar:
-        // se ajusta el stock por la diferencia.
-        const diferenciaBolsas = redondear(linea.bolsas - Number(item.bolsas || 0));
-
-        if(diferenciaBolsas !== 0){
-
-            producto.stock = redondear(Number(producto.stock || 0) - diferenciaBolsas);
-
-        }
-
-        if(linea.precio !== item.precio || linea.subtotal !== item.subtotal || diferenciaBolsas !== 0){
-
-            item.precio = linea.precio;
-            item.subtotal = linea.subtotal;
-            item.bolsas = linea.bolsas;
-            item.kg = linea.kg;
-
-            cambio = true;
-
-        }
-
-    });
-
-    if(cambio){
-
-        guardarDatos("productos");
-
-        actualizarTablaVenta();
-
-    }
-
-}
-
 /* ==========================================
    TABLA VENTA
 ========================================= */
@@ -637,45 +816,63 @@ function actualizarTablaVenta(){
 
     if(!tbody) return;
 
+    tbody.innerHTML = "";
+
     let total = 0;
 
     if(carrito.length === 0){
 
         tbody.innerHTML = `
+
             <tr>
+
                 <td colspan="6" class="tablaVacia">
+
                     Agregá productos para iniciar la venta.
+
                 </td>
+
             </tr>
+
         `;
 
-    }else{
-
-        tbody.innerHTML = carrito.map((item, indice)=>{
-
-            total += item.subtotal;
-
-            return `
-                <tr>
-                    <td>${esc(item.nombre)}</td>
-                    <td>${formatearCantidadItem(item)}</td>
-                    <td>${unidadVenta(item.modo)}</td>
-                    <td>${dinero(item.precio)}</td>
-                    <td>${dinero(item.subtotal)}</td>
-                    <td>
-                        <button
-                            class="btnEliminar"
-                            title="Quitar de la venta"
-                            onclick="eliminarProductoVenta(${indice})">
-                            🗑️
-                        </button>
-                    </td>
-                </tr>
-            `;
-
-        }).join("");
-
     }
+
+    carrito.forEach((item, indice)=>{
+
+        total += item.subtotal;
+
+        tbody.innerHTML += `
+
+            <tr>
+
+                <td>${item.nombre}</td>
+
+                <td>${formatearCantidadItem(item)}</td>
+
+                <td>${unidadVenta(item.modo)}</td>
+
+                <td>${dinero(item.precio)}</td>
+
+                <td>${dinero(item.subtotal)}</td>
+
+                <td>
+
+                    <button
+                        class="btnEliminar"
+                        onclick="eliminarProductoVenta(${indice})">
+
+                        🗑️
+
+                    </button>
+
+                </td>
+
+            </tr>
+
+        `;
+
+    });
 
     const totalEl = document.getElementById("totalVenta");
 
@@ -685,68 +882,59 @@ function actualizarTablaVenta(){
 
     }
 
+    renderAccionPointSmart();
+
+}
+
+function totalCarrito(){
+
+    return carrito.reduce((acc, item) => acc + item.subtotal, 0);
+
 }
 
 function eliminarProductoVenta(indice){
 
     const item = carrito[indice];
 
-    if(!item) return;
-
-    const quitar = ()=>{
+    if(item){
 
         // Se devuelve el stock que se había descontado al cargarlo.
         const producto = productos.find(p => p.id === item.id);
 
         if(producto){
 
-            producto.stock = redondear(Number(producto.stock || 0) + Number(item.bolsas || 0));
+            producto.stock += item.bolsas;
 
         }
 
-        carrito = carrito.filter(x => x !== item);
+    }
 
-        guardarDatos("productos");
+    carrito.splice(indice, 1);
 
-        actualizarTablaVenta();
+    guardarDatos("carrito", "productos");
 
-    };
+    actualizarTablaVenta();
 
-    if(configuracionSistema.ventas.confirmarEliminar){
+    if(paginaActual === "Productos"){
 
-        confirmar("¿Quitar " + item.nombre + " de la venta?", quitar);
-
-    }else{
-
-        quitar();
+        actualizarTablaProductos();
 
     }
 
 }
 
-function stockMinimoDe(producto){
-
-    const propio = Number(producto.stockMinimo || 0);
-
-    if(propio > 0) return propio;
-
-    return Number(configuracionSistema.inventario.stockMinimo || 0);
-
-}
-
 function notificarStockBajo(producto){
 
-    if(!configuracionSistema.inventario.alertas) return;
-
-    const minimo = stockMinimoDe(producto);
-
-    if(Number(producto.stock || 0) <= minimo){
+    if(producto.stock <= producto.stockMinimo){
 
         notificacion(
+
             "⚠ Stock bajo de " + producto.nombre + ": quedan "
             + formatearStock(producto.stock) + " bolsas (mínimo "
-            + minimo + ").",
+            + producto.stockMinimo + ").",
+
             "warning"
+
         );
 
     }
@@ -759,51 +947,92 @@ function notificarStockBajo(producto){
 
 function buscarProductosVenta(){
 
-    const texto = document
-        .getElementById("buscarVenta")
-        .value
-        .trim()
-        .toLowerCase();
+    const texto = normalizarBusqueda(document.getElementById("buscarVenta").value);
 
     const lista = document.getElementById("listaProductosVenta");
 
     lista.innerHTML = "";
 
+    // Cada vez que cambia el texto la lista es otra: se pierde lo que
+    // estaba resaltado con las flechitas.
+    indiceSugerenciaVenta = -1;
+
     if(texto === "") return;
 
-    const encontrados = productos.filter(p => coincideProducto(p, texto));
+    const encontrados = productos.filter(producto=>{
+
+        return (
+
+            normalizarBusqueda(producto.nombre).includes(texto)
+
+            || normalizarBusqueda(producto.id).includes(texto)
+
+        );
+
+    });
 
     if(encontrados.length === 0){
 
         lista.innerHTML = `
+
             <div class="itemBusquedaVacio">
+
                 No se encontraron productos.
+
             </div>
+
         `;
 
         return;
 
     }
 
-    lista.innerHTML = encontrados.slice(0, 40).map(producto=>{
+    encontrados.forEach(producto=>{
 
         const precios = obtenerPreciosProducto(producto);
 
-        return `
+        lista.innerHTML += `
+
             <div
                 class="itemBusquedaProducto"
-                onclick="seleccionarProductoVenta('${esc(producto.id)}')">
-                <strong>${esc(producto.nombre)}</strong>
+                data-id="${producto.id}"
+                onclick="seleccionarProductoVenta('${producto.id}')">
+
+                <strong>${producto.nombre}</strong>
+
                 <br>
+
                 <small>
+
                     Stock: ${formatearStock(producto.stock)}
+
                     • Bolsa: ${dinero(precios.precioBolsa)}
-                    • Kg: ${dinero(precios.precioKg)}
+
+                    • Suelto: ${dinero(precios.precioKg)}
+
                 </small>
+
             </div>
+
         `;
 
-    }).join("");
+    });
+
+}
+
+// Marca con la clase "activo" el ítem resaltado por las flechitas y lo
+// mantiene visible dentro de la lista si hace falta hacer scroll.
+function resaltarSugerenciaVenta(items){
+
+    items.forEach((item, indice)=>{
+
+        item.classList.toggle("activo", indice === indiceSugerenciaVenta);
+
+    });
+
+    const actual = items[indiceSugerenciaVenta];
+
+    if(actual) actual.scrollIntoView({ block: "nearest" });
 
 }
 
@@ -819,33 +1048,9 @@ function agregarProductoVenta(id){
 
     if(!productoVenta) return;
 
-    if(Number(productoVenta.stock || 0) <= 0){
+    if(productoVenta.stock <= 0){
 
         notificacion("Sin stock para " + productoVenta.nombre, "warning");
-
-        productoVenta = null;
-
-        return;
-
-    }
-
-    const precios = obtenerPreciosProducto(productoVenta);
-
-    if(modoVenta === "bolsa" && !(precios.precioBolsa > 0)){
-
-        notificacion(productoVenta.nombre + " no tiene precio por bolsa cargado.", "warning");
-
-        productoVenta = null;
-
-        return;
-
-    }
-
-    if(modoVenta !== "bolsa" && !(precios.precioKg > 0)){
-
-        notificacion(productoVenta.nombre + " no tiene precio por kilo cargado.", "warning");
-
-        productoVenta = null;
 
         return;
 
@@ -858,13 +1063,29 @@ function agregarProductoVenta(id){
 
     input.value = "";
 
-    const ayudas = {
-        bolsa: "Cantidad de bolsas",
-        kg: "Cantidad de kilos",
-        dinero: "Monto en pesos"
-    };
+    if(modoVenta === "bolsa"){
 
-    input.placeholder = ayudas[modoVenta];
+        input.placeholder = "Cantidad de bolsas";
+
+        input.step = "1";
+
+    }
+
+    if(modoVenta === "kg"){
+
+        input.placeholder = "Cantidad de kilos";
+
+        input.step = "0.01";
+
+    }
+
+    if(modoVenta === "dinero"){
+
+        input.placeholder = "Monto en pesos";
+
+        input.step = "0.01";
+
+    }
 
     document.getElementById("tituloModalCantidad").textContent = productoVenta.nombre;
 
@@ -890,7 +1111,7 @@ function actualizarPreviewCantidad(){
 
     }
 
-    const monto = numeroDe("inputCantidad");
+    const monto = Number(document.getElementById("inputCantidad").value);
 
     const precios = obtenerPreciosProducto(productoVenta);
 
@@ -910,11 +1131,6 @@ function actualizarPreviewCantidad(){
 
 function confirmarCantidad(){
 
-    // Se vuelve a buscar el producto: si mientras estaba abierto el
-    // cuadro llegó un cambio de otra PC, la lista se reemplazó y hay que
-    // descontar el stock sobre el registro actual (si no, se perdía).
-    if(productoVenta) productoVenta = productos.find(p => p.id === productoVenta.id) || null;
-
     if(!productoVenta){
 
         notificacion("Seleccioná un producto.", "warning");
@@ -923,7 +1139,7 @@ function confirmarCantidad(){
 
     }
 
-    const cantidad = numeroDe("inputCantidad");
+    const cantidad = Number(document.getElementById("inputCantidad").value);
 
     if(!cantidad || cantidad <= 0){
 
@@ -935,11 +1151,14 @@ function confirmarCantidad(){
 
     const linea = calcularLineaVenta(productoVenta, cantidad, modoVenta);
 
-    if(linea.bolsas > Number(productoVenta.stock || 0) + 0.0001){
+    if(linea.bolsas > productoVenta.stock){
 
         notificacion(
+
             "Stock insuficiente. Disponible: " + formatearStock(productoVenta.stock) + " bolsas.",
+
             "error"
+
         );
 
         return;
@@ -947,20 +1166,26 @@ function confirmarCantidad(){
     }
 
     // Se descuenta el stock automáticamente al cargar el producto al carrito.
-    productoVenta.stock = redondear(Number(productoVenta.stock || 0) - linea.bolsas);
+    productoVenta.stock -= linea.bolsas;
 
     const existente = carrito.find(item =>
+
         item.id === productoVenta.id && item.modo === modoVenta
+
     );
 
     if(existente){
 
-        existente.cantidad = redondear(existente.cantidad + cantidad);
+        existente.cantidad += cantidad;
 
         const nuevaLinea = calcularLineaVenta(
+
             productoVenta,
+
             existente.cantidad,
+
             existente.modo
+
         );
 
         existente.precio = nuevaLinea.precio;
@@ -971,24 +1196,39 @@ function confirmarCantidad(){
     }else{
 
         carrito.push({
+
             id: productoVenta.id,
+
             nombre: productoVenta.nombre,
+
             cantidad,
+
             precio: linea.precio,
+
             modo: modoVenta,
+
             subtotal: linea.subtotal,
+
             bolsas: linea.bolsas,
+
             kg: linea.kg
+
         });
 
     }
 
-    guardarDatos("productos");
+    guardarDatos("carrito", "productos");
 
     const productoAfectado = productoVenta;
 
     cerrarModalCantidad();
     actualizarTablaVenta();
+
+    if(paginaActual === "Productos"){
+
+        actualizarTablaProductos();
+
+    }
 
     notificarStockBajo(productoAfectado);
 
@@ -1003,9 +1243,7 @@ function enfocarBuscadorVenta(){
     if(buscar){
 
         buscar.value = "";
-
         document.getElementById("listaProductosVenta").innerHTML = "";
-
         buscar.focus();
 
     }
@@ -1013,20 +1251,568 @@ function enfocarBuscadorVenta(){
 }
 
 /* ==========================================
-   REGISTRAR VENTA
+   COBRO CON MERCADO PAGO POINT
+   ------------------------------------------
+   Manda el monto al Point Smart vinculado y
+   espera (con polling) a que el cliente pague
+   para registrar la venta sola. Si no hay
+   credenciales configuradas, o la app no corre
+   dentro de Electron, esta sección simplemente
+   no muestra ningún botón.
 ========================================= */
 
-function siguienteNumeroVenta(){
+function mpDisponible(){
 
-    let mayor = 0;
+    return Boolean(window.forralitasNative) && mpConfigCache.tieneToken && mpConfigCache.deviceId;
 
-    historialVentas.forEach(v =>{
+}
 
-        if(Number(v.numero) > mayor) mayor = Number(v.numero);
+// Recargo por pagar con tarjeta de crédito: se suma al total del carrito
+// antes de mandar el cobro al Point Smart. El débito no tiene recargo.
+// El porcentaje se configura en Configuración > Negocio > Ventas.
+function montoConRecargoCredito(total){
+
+    return Math.round(total * (1 + porcentajeRecargoCredito() / 100) * 100) / 100;
+
+}
+
+// La detección de transferencias/QR no usa el Point, así que alcanza con
+// tener el Access Token guardado (no hace falta dispositivo vinculado).
+function mpTransferenciasDisponible(){
+
+    return Boolean(window.forralitasNative)
+        && mpConfigCache.tieneToken
+        && configuracionSistema?.negocio?.detectarTransferenciasMP !== false;
+
+}
+
+function renderAccionPointSmart(){
+
+    const cont = document.getElementById("accionPointSmart");
+
+    if(!cont) return;
+
+    // Si la venta es "fiado" (debe), no se cobra nada ahora.
+    if(clienteSeleccionado && estadoVenta === "debe"){
+
+        cont.innerHTML = "";
+
+        return;
+
+    }
+
+    // El Point solo se usa para cobrar con tarjeta (débito/crédito). Las
+    // ventas en efectivo o transferencia se registran directo, sin pasar
+    // por el dispositivo: el Point igual va a imprimir su ticket al
+    // confirmar la venta (ver ticket.js).
+    const total = totalCarrito();
+
+    if(metodoPago === "tarjeta" && total > 0){
+
+        if(!mpDisponible()){
+
+            cont.innerHTML = "";
+
+            return;
+
+        }
+
+        const totalCredito = montoConRecargoCredito(total);
+
+        cont.innerHTML = `
+            <div class="accionesTarjetaPoint">
+                <button type="button" class="btnGuardar" onclick="iniciarCobroPointSmart('debito', ${total})">
+                    📟 Débito ${dinero(total)}
+                </button>
+                <button type="button" class="btnGuardar" onclick="iniciarCobroPointSmart('credito', ${totalCredito})">
+                    📟 Crédito ${dinero(totalCredito)} (+${porcentajeRecargoCredito()}%)
+                </button>
+            </div>
+        `;
+
+        return;
+
+    }
+
+    // Transferencia/QR: no pasa por el Point. Con el token de Mercado Pago
+    // configurado, "Registrar venta" ya deja la venta esperando a que la
+    // transferencia impacte sola (ver registrarVenta/revisarTransferenciasMP);
+    // acá solo se avisa de eso, no hace falta un botón aparte.
+    if(metodoPago === "transferencia" && total > 0){
+
+        cont.innerHTML = mpTransferenciasDisponible()
+            ? `<p class="notaAccionPago">🔔 Al registrar, se espera a que la transferencia impacte en Mercado Pago.</p>`
+            : "";
+
+        return;
+
+    }
+
+    if(metodoPago === "mixto"){
+
+        const montoElectronico = Number(document.getElementById("montoTransferencia")?.value) || 0;
+        const tipo = document.getElementById("tipoElectronicoMixto")?.value || "transferencia";
+
+        if(montoElectronico <= 0){
+
+            cont.innerHTML = "";
+
+            return;
+
+        }
+
+        if(tipo === "tarjeta" && mpDisponible()){
+
+            cont.innerHTML = `
+                <button type="button" class="btnGuardar" onclick="iniciarCobroPointSmart('tarjeta', ${montoElectronico}, true)">
+                    📟 Cobrar ${dinero(montoElectronico)} (resto) con Point Smart
+                </button>
+            `;
+
+            return;
+
+        }
+
+        if(tipo === "transferencia" && mpTransferenciasDisponible()){
+
+            cont.innerHTML = `<p class="notaAccionPago">🔔 Al registrar, se espera a que la transferencia del resto impacte en Mercado Pago.</p>`;
+
+            return;
+
+        }
+
+        cont.innerHTML = "";
+
+        return;
+
+    }
+
+    cont.innerHTML = "";
+
+}
+
+async function iniciarCobroPointSmart(tipo, monto, esMixto){
+
+    if(!(monto > 0)){
+
+        notificacion("Monto inválido para cobrar.", "warning");
+
+        return;
+
+    }
+
+    const referencia = "FR" + Date.now();
+
+    document.getElementById("montoPointSmart").textContent = dinero(monto);
+    document.getElementById("textoPointSmart").textContent = "Esperando a que el cliente pague en el dispositivo...";
+
+    abrir("modalPointSmart");
+
+    try{
+
+        const resultado = await window.forralitasNative.mp.crearCobro({ monto, tipo, referencia });
+
+        ordenPointSmartActual = resultado.orderId;
+
+    }catch(error){
+
+        cerrarModalPointSmart();
+
+        notificacion("No se pudo iniciar el cobro: " + error.message, "error");
+
+        return;
+
+    }
+
+    intervaloPointSmart = setInterval(async ()=>{
+
+        if(!ordenPointSmartActual) return;
+
+        try{
+
+            const estado = await window.forralitasNative.mp.consultarCobro(ordenPointSmartActual);
+
+            if(estado.aprobado){
+
+                const orden = ordenPointSmartActual;
+
+                detenerPollingPointSmart();
+                cerrar("modalPointSmart");
+
+                confirmarVentaPorPointSmart(tipo, monto, esMixto, estado.paymentId, orden);
+
+            }else if(estado.rechazado){
+
+                detenerPollingPointSmart();
+                cerrar("modalPointSmart");
+
+                notificacion("El cobro no se completó en el Point Smart (" + estado.status + ").", "warning");
+
+            }
+
+        }catch{
+
+            // Error de red puntual al consultar: se reintenta en el próximo tick.
+
+        }
+
+    }, 2500);
+
+}
+
+function detenerPollingPointSmart(){
+
+    if(intervaloPointSmart){
+
+        clearInterval(intervaloPointSmart);
+        intervaloPointSmart = null;
+
+    }
+
+    ordenPointSmartActual = null;
+
+}
+
+function cerrarModalPointSmart(){
+
+    cerrar("modalPointSmart");
+
+    detenerPollingPointSmart();
+
+}
+
+async function cancelarCobroPointSmart(){
+
+    const orden = ordenPointSmartActual;
+
+    cerrarModalPointSmart();
+
+    if(orden && window.forralitasNative){
+
+        try{ await window.forralitasNative.mp.cancelarCobro(orden); }catch{}
+
+    }
+
+    notificacion("Cobro cancelado.", "warning");
+
+}
+
+function confirmarVentaPorPointSmart(tipo, monto, esMixto, paymentId, orderId){
+
+    let pago = { efectivo: 0, transferencia: 0, tarjeta: 0 };
+
+    let metodoPagoFinal = "tarjeta";
+
+    if(esMixto){
+
+        pago.efectivo = Number(document.getElementById("montoEfectivo")?.value) || 0;
+        metodoPagoFinal = "mixto";
+
+    }
+
+    pago.tarjeta = monto;
+
+    // Con crédito (sin mixto) el monto cobrado ya incluye el recargo por
+    // crédito, así que la venta registrada queda por ese total: es la plata
+    // que realmente entró a la caja.
+    const totalOverride = (!esMixto && tipo === "credito") ? monto : undefined;
+
+    finalizarVenta(metodoPagoFinal, pago, {
+
+        pagoMP: { orderId, paymentId, tipo },
+        mensaje: "Pago aprobado en el Point Smart. Venta registrada.",
+        totalOverride
 
     });
 
-    return Math.max(mayor, historialVentas.length) + 1;
+}
+
+/* ==========================================
+   TRANSFERENCIAS / QR DE MERCADO PAGO
+   ------------------------------------------
+   No hay (ni puede haber, sin un servidor con
+   dirección pública) un webhook que Mercado Pago
+   le avise directo a esta PC cuando entra una
+   transferencia. En cambio, cada pocos segundos
+   se consultan los últimos pagos acreditados en
+   la cuenta (ver mp:buscar-pagos-recientes) y:
+
+   - Si hay una venta esperando una transferencia
+     puntual (ver iniciarEsperaTransferenciaMP) y
+     el monto coincide, la venta se registra sola.
+   - Cualquier otro pago nuevo (recibido fuera de
+     una espera activa) solo dispara un aviso, para
+     no inventar ventas que no se cargaron en la app.
+========================================= */
+
+// Se llama una sola vez, al loguearse (ver app.js > iniciarAppLogueada),
+// para que avise de transferencias sin importar en qué pantalla se esté.
+function iniciarMonitorTransferenciasMP(){
+
+    if(intervaloTransferenciasMP) return;
+
+    cargarConfigMP();
+
+    intervaloTransferenciasMP = setInterval(revisarTransferenciasMP, 7000);
+
+}
+
+async function revisarTransferenciasMP(){
+
+    if(!window.forralitasNative) return;
+
+    if(configuracionSistema?.negocio?.detectarTransferenciasMP === false) return;
+
+    if(!mpConfigCache.tieneToken) return;
+
+    const desde = desdeMonitorTransferenciasMP
+        || new Date(Date.now() - 2 * 60 * 1000).toISOString();
+
+    let pagos;
+
+    try{
+
+        pagos = await window.forralitasNative.mp.buscarPagosRecientes({ desde });
+
+    }catch{
+
+        // Sin internet o token inválido: se reintenta en el próximo ciclo.
+        return;
+
+    }
+
+    // Pequeño solapamiento hacia atrás para no perder pagos por diferencias
+    // de reloj/latencia entre esta consulta y la próxima.
+    desdeMonitorTransferenciasMP = new Date(Date.now() - 20 * 1000).toISOString();
+
+    const nuevos = (pagos || []).filter(pago =>
+
+        !historialVentas.some(v => v.pagoMP && String(v.pagoMP.paymentId) === pago.id)
+
+    );
+
+    nuevos.forEach(pago =>{
+
+        if(transferenciaEsperada && Math.abs(pago.monto - transferenciaEsperada.monto) < 1){
+
+            const esperada = transferenciaEsperada;
+
+            transferenciaEsperada = null;
+
+            cerrarModalEsperaTransferencia(true);
+
+            confirmarVentaPorTransferenciaMP(pago, esperada.esMixto);
+
+        }else{
+
+            notificacion("💰 Transferencia recibida: " + dinero(pago.monto) + " (Mercado Pago)", "success");
+
+        }
+
+    });
+
+}
+
+function iniciarEsperaTransferenciaMP(monto, esMixto){
+
+    if(!(monto > 0)){
+
+        notificacion("Monto inválido para esperar.", "warning");
+
+        return;
+
+    }
+
+    transferenciaEsperada = { monto, esMixto };
+
+    document.getElementById("montoEsperaTransferencia").textContent = dinero(monto);
+
+    document.getElementById("textoEsperaTransferencia").textContent =
+        "Esperando a que se acredite la transferencia en Mercado Pago...";
+
+    abrir("modalEsperaTransferencia");
+
+}
+
+function cerrarModalEsperaTransferencia(ventaConfirmada){
+
+    cerrar("modalEsperaTransferencia");
+
+    if(!ventaConfirmada) transferenciaEsperada = null;
+
+}
+
+function cancelarEsperaTransferenciaMP(){
+
+    cerrarModalEsperaTransferencia(false);
+
+    notificacion("Se dejó de esperar la transferencia. Si ya se acreditó, va a avisar igual.", "warning");
+
+}
+
+// Salida de emergencia por si la detección falla (sin internet, demora,
+// etc.) o el cajero prefiere confiar en el cliente sin esperar: registra
+// la venta igual, pero sin el paymentId real de Mercado Pago.
+function confirmarSinEsperarTransferenciaMP(){
+
+    if(!transferenciaEsperada) return;
+
+    const esperada = transferenciaEsperada;
+
+    transferenciaEsperada = null;
+
+    cerrar("modalEsperaTransferencia");
+
+    let pago = { efectivo: 0, transferencia: 0, tarjeta: 0 };
+
+    let metodoPagoFinal = "transferencia";
+
+    if(esperada.esMixto){
+
+        pago.efectivo = Number(document.getElementById("montoEfectivo")?.value) || 0;
+
+        metodoPagoFinal = "mixto";
+
+    }
+
+    pago.transferencia = esperada.monto;
+
+    finalizarVenta(metodoPagoFinal, pago, {
+
+        mensaje: "Venta registrada sin esperar la confirmación de Mercado Pago."
+
+    });
+
+}
+
+function confirmarVentaPorTransferenciaMP(pago, esMixto){
+
+    let pagoObj = { efectivo: 0, transferencia: 0, tarjeta: 0 };
+
+    let metodoPagoFinal = "transferencia";
+
+    if(esMixto){
+
+        pagoObj.efectivo = Number(document.getElementById("montoEfectivo")?.value) || 0;
+
+        metodoPagoFinal = "mixto";
+
+    }
+
+    pagoObj.transferencia = pago.monto;
+
+    finalizarVenta(metodoPagoFinal, pagoObj, {
+
+        pagoMP: { paymentId: pago.id, tipo: "transferencia" },
+        mensaje: "✅ Transferencia acreditada (" + dinero(pago.monto) + "). Venta registrada."
+
+    });
+
+}
+
+/* ==========================================
+   REGISTRAR VENTA
+========================================= */
+
+// Arma el objeto venta, lo guarda en el historial, descuenta saldo de
+// cliente si corresponde, limpia el carrito/formulario e imprime el
+// ticket. La usan tanto el botón manual "Registrar venta" como el
+// cobro automático por Point Smart, para no duplicar esta lógica.
+function finalizarVenta(metodoPagoFinal, pago, opciones = {}){
+
+    // El recargo por tarjeta de crédito (ver montoConRecargoCredito) hace
+    // que la plata cobrada sea mayor al total "de góndola" del carrito;
+    // en ese caso la venta queda registrada por lo que realmente se cobró.
+    const total = opciones.totalOverride ?? totalCarrito();
+
+    const venta = {
+
+        id: "V" + Date.now(),
+
+        fecha: new Date().toISOString(),
+
+        fechaTexto: fechaHoraTexto(new Date()),
+
+        cliente: clienteSeleccionado
+
+            ? {
+                id: clienteSeleccionado.id,
+                nombre: clienteSeleccionado.nombre
+            }
+
+            : null,
+
+        vendedor: usuarioActual
+
+            ? {
+                usuario: usuarioActual.usuario,
+                nombre: usuarioActual.nombre
+            }
+
+            : null,
+
+        productos: carrito.map(item => ({ ...item })),
+
+        total,
+
+        metodoPago: metodoPagoFinal,
+
+        pago,
+
+        // Solo las ventas "debe" llevan seguimiento de saldo pendiente;
+        // las demás quedan cobradas de una al momento de la venta.
+        saldoPendiente: (clienteSeleccionado && estadoVenta === "debe") ? total : 0,
+
+        pagada: !(clienteSeleccionado && estadoVenta === "debe")
+
+    };
+
+    if(opciones.pagoMP) venta.pagoMP = opciones.pagoMP;
+
+    historialVentas.unshift(venta);
+
+    let saldoClienteActualizado = false;
+
+    if(clienteSeleccionado && estadoVenta === "debe"){
+
+        const cliente = clientes.find(c => c.id === clienteSeleccionado.id);
+
+        if(cliente){
+
+            cliente.saldo = Number(cliente.saldo || 0) + total;
+
+            clienteSeleccionado.saldo = cliente.saldo;
+
+            saldoClienteActualizado = true;
+
+        }
+
+    }
+
+    carrito = [];
+    clienteSeleccionado = null;
+
+    guardarDatos(
+        "historialVentas",
+        "carrito",
+        ...(saldoClienteActualizado ? ["clientes"] : [])
+    );
+    actualizarTablaVenta();
+    actualizarClienteVentaUI();
+
+    const montoEfectivo = document.getElementById("montoEfectivo");
+    const montoTransferencia = document.getElementById("montoTransferencia");
+
+    if(montoEfectivo) montoEfectivo.value = "";
+    if(montoTransferencia) montoTransferencia.value = "";
+
+    cambiarMetodoPago("efectivo");
+
+    notificacion(opciones.mensaje || "Venta registrada correctamente.");
+
+    imprimirTicketVenta(venta);
+
+    return venta;
 
 }
 
@@ -1040,18 +1826,23 @@ function registrarVenta(){
 
     }
 
-    const esDebe = !!clienteSeleccionado && estadoVenta === "debe";
+    const total = totalCarrito();
 
-    const total = redondear(carrito.reduce((acc, item) => acc + Number(item.subtotal || 0), 0), 2);
+    let pago = {
+        efectivo: 0,
+        transferencia: 0,
+        tarjeta: 0
+    };
 
-    const pago = { efectivo: 0, transferencia: 0 };
+    const esFiado = clienteSeleccionado && estadoVenta === "debe";
 
     // Si la venta se marca como "DEBE", no se registra plata cobrada
-    // (ni efectivo ni transferencia): el dinero todavía no entró a la
-    // caja, así que en los reportes no debe sumar como si estuviera.
-    if(esDebe){
+    // (ni efectivo ni transferencia/tarjeta): el dinero todavía no
+    // entró a la caja, así que en los reportes no debe sumar como si
+    // estuviera.
+    if(esFiado){
 
-        // pago queda en 0/0 a propósito
+        // pago queda en 0 a propósito
 
     }else if(metodoPago === "efectivo"){
 
@@ -1059,19 +1850,53 @@ function registrarVenta(){
 
     }else if(metodoPago === "transferencia"){
 
+        // Con el Access Token de Mercado Pago configurado, "Registrar
+        // venta" no carga la venta al toque: la deja esperando a que la
+        // transferencia realmente impacte en la cuenta (ver
+        // confirmarVentaPorTransferenciaMP). Sin token configurado sigue
+        // funcionando como antes, al toque y de confianza.
+        if(mpTransferenciasDisponible() && total > 0){
+
+            iniciarEsperaTransferenciaMP(total, false);
+
+            return;
+
+        }
+
         pago.transferencia = total;
+
+    }else if(metodoPago === "tarjeta"){
+
+        pago.tarjeta = total;
 
     }else{
 
-        pago.efectivo = numeroDe("montoEfectivo");
-        pago.transferencia = numeroDe("montoTransferencia");
+        pago.efectivo = Number(document.getElementById("montoEfectivo").value) || 0;
 
-        if(Math.abs(pago.efectivo + pago.transferencia - total) > 0.01){
+        const montoElectronico = Number(document.getElementById("montoTransferencia").value) || 0;
+        const tipoElectronico = document.getElementById("tipoElectronicoMixto")?.value || "transferencia";
+
+        pago[tipoElectronico] = montoElectronico;
+
+        const suma = pago.efectivo + pago.transferencia + pago.tarjeta;
+
+        if(Math.abs(suma - total) > 0.01){
 
             notificacion(
+
                 "Los montos del pago mixto deben sumar " + dinero(total) + ".",
+
                 "warning"
+
             );
+
+            return;
+
+        }
+
+        if(tipoElectronico === "transferencia" && mpTransferenciasDisponible() && montoElectronico > 0){
+
+            iniciarEsperaTransferenciaMP(montoElectronico, true);
 
             return;
 
@@ -1079,153 +1904,16 @@ function registrarVenta(){
 
     }
 
-    if(configuracionSistema.ventas.confirmarVenta && !registrarVenta.confirmada){
+    // El estado "debe" siempre queda registrado como método de pago
+    // "debe", sin importar qué botón (efectivo/transferencia/tarjeta/
+    // mixto) haya quedado seleccionado antes, para que se distinga
+    // bien en el historial y no se cuente como plata cobrada en los
+    // reportes.
+    const metodoPagoFinal = (clienteSeleccionado && estadoVenta === "debe")
+        ? "debe"
+        : metodoPago;
 
-        confirmar("¿Registrar la venta por " + dinero(total) + (esDebe ? " como DEBE" : "") + "?", ()=>{
-
-            registrarVenta.confirmada = true;
-
-            try{ registrarVenta(); }finally{ registrarVenta.confirmada = false; }
-
-        });
-
-        return;
-
-    }
-
-    const ahora = new Date();
-
-    // Cada producto guarda también cuánto hay que "separar" y cuánto
-    // costó, para que los reportes viejos no cambien si después se
-    // modifica el producto.
-    const items = carrito.map(item =>{
-
-        const copia = { ...item };
-
-        const producto = productos.find(p => p.id === item.id);
-
-        if(producto){
-
-            if(Number(producto.separarPorBolsa) > 0){
-
-                copia.separar = Number(producto.separarPorBolsa);
-                copia.grupoSeparar = producto.grupoSeparar || producto.nombre;
-
-            }
-
-            if(Number(producto.costoBolsa) > 0) copia.costo = Number(producto.costoBolsa);
-
-        }
-
-        return copia;
-
-    });
-
-    const venta = {
-
-        id: nuevoId("V"),
-
-        numero: siguienteNumeroVenta(),
-
-        fecha: ahora.toISOString(),
-
-        fechaTexto: fechaHoraTexto(ahora),
-
-        cliente: clienteSeleccionado
-            ? { id: clienteSeleccionado.id, nombre: clienteSeleccionado.nombre }
-            : null,
-
-        vendedor: usuarioActual
-            ? { usuario: usuarioActual.usuario, nombre: usuarioActual.nombre }
-            : null,
-
-        productos: items,
-
-        total,
-
-        // El estado "debe" siempre queda registrado como método de pago
-        // "debe", sin importar qué botón (efectivo/transferencia/mixto)
-        // haya quedado seleccionado antes.
-        metodoPago: esDebe ? "debe" : metodoPago,
-
-        pago,
-
-        // Solo las ventas "debe" llevan seguimiento de saldo pendiente.
-        saldoPendiente: esDebe ? total : 0,
-
-        pagada: !esDebe
-
-    };
-
-    historialVentas.unshift(venta);
-
-    if(esDebe){
-
-        const cliente = clientes.find(c => c.id === clienteSeleccionado.id);
-
-        if(cliente){
-
-            cliente.saldo = redondear(Number(cliente.saldo || 0) + total, 2);
-
-        }
-
-    }
-
-    carrito = [];
-    clienteSeleccionado = null;
-
-    guardarDatos("historialVentas", "clientes");
-
-    actualizarTablaVenta();
-    actualizarClienteVentaUI();
-
-    limpiar("montoEfectivo", "montoTransferencia");
-
-    cambiarMetodoPago("efectivo");
-    cambiarEstadoVenta("paga");
-
-    notificacion("Venta N.º " + venta.numero + " registrada correctamente.");
-
-    if(configuracionSistema.ventas.sonidoVenta) reproducirSonidoVenta();
-
-    enviarAvisoGalpon(venta);
-
-    if(configuracionSistema.ventas.imprimirAlVender) imprimirComprobanteVenta(venta.id);
-
-    enfocarBuscadorVenta();
-
-}
-
-/* ==========================================
-   AVISO A LA PANTALLA DEL GALPÓN
-   (pantalla-galpon/index.html muestra en una
-   tele qué hay que preparar para cada venta)
-========================================== */
-
-function enviarAvisoGalpon(venta){
-
-    if(!adaptadorActual || !configuracionSistema.ventas.avisoGalpon) return;
-
-    const items = (venta.productos || []).map(item =>{
-
-        if(item.modo === "bolsa"){
-
-            return formatearCantidadItem(item) + (Number(item.cantidad) === 1 ? " bolsa" : " bolsas") + " · " + item.nombre;
-
-        }
-
-        return Number(item.kg || 0).toFixed(2) + " kg · " + item.nombre;
-
-    });
-
-    adaptadorActual.escribir("avisoGalpon", {
-        datos: {
-            numero: venta.numero,
-            items,
-            hora: venta.fechaTexto.slice(-5),
-            id: venta.id
-        },
-        actualizado: Date.now()
-    }).catch(e => console.warn("[Galpón] No se pudo enviar el aviso:", e && e.message));
+    // El stock ya se descontó al cargar cada producto al carrito.
+    finalizarVenta(metodoPagoFinal, pago);
 
 }

@@ -1,40 +1,8 @@
 /* ==========================================
-   UI - UTILIDADES, MODALES Y NOTIFICACIONES
+   UI - MODALES Y NOTIFICACIONES
 ========================================== */
 
 let confirmacionCallback = null;
-
-/* ==========================================
-   TEXTO SEGURO
-   Todo dato cargado por una persona (nombres,
-   descripciones, notas) pasa por esc() antes
-   de mostrarse, para que un nombre con
-   símbolos como < > " ' no rompa la pantalla.
-========================================== */
-
-function esc(valor){
-
-    return String(valor === null || valor === undefined ? "" : valor)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-
-}
-
-/* ==========================================
-   IDENTIFICADORES
-   Prefijo + fecha + letras al azar: dos PCs
-   que cargan algo en el mismo instante nunca
-   generan el mismo identificador.
-========================================== */
-
-function nuevoId(prefijo){
-
-    return prefijo + Date.now() + Math.random().toString(36).slice(2, 6);
-
-}
 
 /* ==========================================
    CAMPOS NUMÉRICOS "LIBRES"
@@ -62,48 +30,34 @@ function limpiarNumero(input){
 
 }
 
-function numeroDe(id){
-
-    const el = document.getElementById(id);
-
-    if(!el) return 0;
-
-    return Number(String(el.value).replace(",", ".")) || 0;
-
-}
-
-/* Evita errores de decimales (0.1 + 0.2 = 0.30000000000000004). */
-function redondear(n, decimales = 4){
-
-    const f = Math.pow(10, decimales);
-
-    return Math.round((Number(n) || 0) * f) / f;
-
-}
-
 /* ==========================================
    MODALES
 ========================================== */
 
 function abrir(id){
 
-    const el = document.getElementById(id);
-
-    if(el) el.classList.remove("oculto");
+    document.getElementById(id).classList.remove("oculto");
 
 }
 
 function cerrar(id){
 
-    const el = document.getElementById(id);
-
-    if(el) el.classList.add("oculto");
+    document.getElementById(id).classList.add("oculto");
 
 }
 
-function cerrarModalProducto(){ cerrar("modalProducto"); }
 
-function cerrarModalCliente(){ cerrar("modalCliente"); }
+function cerrarModalProducto(){
+
+    cerrar("modalProducto");
+
+}
+
+function cerrarModalCliente(){
+
+    cerrar("modalCliente");
+
+}
 
 function cerrarModalCantidad(){
 
@@ -117,9 +71,17 @@ function cerrarModalCantidad(){
 
 }
 
-function cerrarModalPrecioCliente(){ cerrar("modalPrecioCliente"); }
+function cerrarModalPrecioCliente(){
 
-function cerrarModalPagoCliente(){ cerrar("modalPagoCliente"); }
+    cerrar("modalPrecioCliente");
+
+}
+
+function cerrarModalPagoCliente(){
+
+    cerrar("modalPagoCliente");
+
+}
 
 function limpiar(...ids){
 
@@ -127,7 +89,17 @@ function limpiar(...ids){
 
         const el = document.getElementById(id);
 
-        if(el) el.value = "";
+        if(!el) return;
+
+        if(el.tagName === "TEXTAREA"){
+
+            el.value = "";
+
+        }else{
+
+            el.value = "";
+
+        }
 
     });
 
@@ -157,11 +129,13 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
         cerrar("modalConfirmacion");
 
-        const cb = confirmacionCallback;
+        if(confirmacionCallback){
 
-        confirmacionCallback = null;
+            confirmacionCallback();
 
-        if(cb) cb();
+            confirmacionCallback = null;
+
+        }
 
     };
 
@@ -173,18 +147,17 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
     };
 
+    // El Enter para confirmar este modal (y los demás) lo maneja el
+    // listener global de más abajo; acá solo queda la vista previa en vivo.
     const inputCantidad = document.getElementById("inputCantidad");
 
     if(inputCantidad){
 
-        inputCantidad.addEventListener("keydown", (e)=>{
+        inputCantidad.addEventListener("input", ()=>{
 
-            if(e.key === "Enter"){
+            if(typeof actualizarPreviewCantidad === "function"){
 
-                e.preventDefault();
-                e.stopPropagation();
-
-                confirmarCantidad();
+                actualizarPreviewCantidad();
 
             }
 
@@ -192,62 +165,87 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
     }
 
-    // Enter en el modal de pago de cliente.
-    const montoPago = document.getElementById("montoPagoCliente");
+});
 
-    if(montoPago){
+/* ==========================================
+   ENTER / ESC EN MODALES
+   ------------------------------------------
+   Todos los modales siguen la misma estructura
+   (.modal > .modalContenido > .accionesModal con
+   un .btnGuardar y un .btnCancelar), así que un
+   solo listener alcanza para los 15 y pico que
+   hay en vez de cablear cada uno a mano:
+   - Enter confirma (clickea el .btnGuardar).
+   - Esc cancela (clickea el .btnCancelar, o si el
+     modal no tiene uno, simplemente lo cierra).
+========================================== */
 
-        montoPago.addEventListener("keydown", (e)=>{
+document.addEventListener("keydown", (e)=>{
 
-            if(e.key === "Enter"){
+    if(e.key !== "Enter" && e.key !== "Escape") return;
 
-                e.preventDefault();
+    const modalAbierto = document.querySelector(".modal:not(.oculto)");
 
-                guardarPagoCliente();
+    if(e.key === "Escape"){
+
+        // Con un modal abierto, el Esc es para ÉL primero (cancela sin
+        // tocar la pantalla de detalle que pueda haber debajo).
+        if(modalAbierto){
+
+            e.preventDefault();
+
+            const btnCancelar = modalAbierto.querySelector(".btnCancelar");
+
+            if(btnCancelar){
+
+                btnCancelar.click();
+
+            }else{
+
+                cerrar(modalAbierto.id);
 
             }
 
-        });
+            return;
+
+        }
+
+        // Sin modal: Esc es "Volver" en cualquier pantalla de detalle
+        // (Cliente, Proveedor, Mezcla, Anotación, etc.), igual que el
+        // botón ← Volver de arriba.
+        const pantallaAbierta = document.querySelector(".pantallaDetalle:not(.oculto)");
+
+        const btnVolver = pantallaAbierta && pantallaAbierta.querySelector(".btnVolver");
+
+        if(btnVolver){
+
+            e.preventDefault();
+
+            btnVolver.click();
+
+        }
+
+        return;
 
     }
 
-    // Enter en el modal de precio de cliente.
-    const precioKgCliente = document.getElementById("precioKgCliente");
+    if(!modalAbierto) return;
 
-    if(precioKgCliente){
+    // Enter: en un textarea tiene que seguir agregando un salto de línea
+    // (ej: notas), no disparar el guardado del modal entero. Y si el foco
+    // ya está en un botón (Cancelar, + Agregar ingrediente, etc.) se deja
+    // que el Enter nativo lo active a ÉL, no al Guardar de otro lado.
+    const activo = document.activeElement;
 
-        precioKgCliente.addEventListener("keydown", (e)=>{
+    if(activo && (activo.tagName === "TEXTAREA" || activo.tagName === "BUTTON")) return;
 
-            if(e.key === "Enter"){
+    const btnGuardar = modalAbierto.querySelector(".btnGuardar");
 
-                e.preventDefault();
+    if(!btnGuardar || btnGuardar.disabled) return;
 
-                guardarPrecioCliente();
+    e.preventDefault();
 
-            }
-
-        });
-
-    }
-
-    // Escape cierra el modal que esté abierto (el de arriba de todo).
-    document.addEventListener("keydown", (e)=>{
-
-        if(e.key !== "Escape") return;
-
-        const abiertos = document.querySelectorAll(".modal:not(.oculto)");
-
-        if(abiertos.length === 0) return;
-
-        const ultimo = abiertos[abiertos.length - 1];
-
-        ultimo.classList.add("oculto");
-
-        if(ultimo.id === "modalConfirmacion") confirmacionCallback = null;
-
-        if(ultimo.id === "modalCantidad") productoVenta = null;
-
-    });
+    btnGuardar.click();
 
 });
 
@@ -269,7 +267,7 @@ function notificacion(mensaje, tipo = "success"){
 
     contenedor.appendChild(div);
 
-    setTimeout(()=> div.remove(), tipo === "success" ? 3200 : 5000);
+    setTimeout(()=> div.remove(), 3200);
 
 }
 
@@ -279,7 +277,7 @@ function notificacion(mensaje, tipo = "success"){
 
 function dinero(valor){
 
-    return "$" + Number(valor || 0).toLocaleString("es-AR", { maximumFractionDigits: 2 });
+    return "$" + Number(valor || 0).toLocaleString("es-AR");
 
 }
 
@@ -289,11 +287,15 @@ function unidadVenta(modo){
 
     if(modo === "kg") return "Kg";
 
-    if(modo === "dinero") return "kg";
+    if(modo==="dinero") return "kg";
 
     return "$";
 
 }
+
+/* ==========================================
+   FORMATEAR STOCK
+========================================== */
 
 function formatearStock(valor){
 
@@ -306,10 +308,9 @@ function formatearStock(valor){
 }
 
 /* ==========================================
-   FECHAS
+   FECHA (YYYY-MM-DD local)
 ========================================== */
 
-// YYYY-MM-DD en hora local.
 function fechaLocalISO(fecha){
 
     const d = fecha instanceof Date ? fecha : new Date(fecha);
@@ -324,7 +325,11 @@ function fechaLocalISO(fecha){
 
 }
 
-// "26/08/2026 16:45" (formato 24 hs).
+/* ==========================================
+   FECHA Y HORA EN TEXTO (formato 24 hs)
+   Ej: "26/08/2026 16:45"
+========================================== */
+
 function fechaHoraTexto(fecha){
 
     const d = fecha instanceof Date ? fecha : new Date(fecha);
@@ -343,171 +348,14 @@ function fechaHoraTexto(fecha){
 
 }
 
-// "2026-08-26" → "26/08/2026".
-function fechaTextoDeISO(fechaISO){
-
-    const partes = String(fechaISO || "").slice(0, 10).split("-");
-
-    if(partes.length !== 3) return "—";
-
-    return `${partes[2]}/${partes[1]}/${partes[0]}`;
-
-}
-
-// Valor para un <input type="datetime-local"> en hora local.
-function fechaParaInputLocal(fecha){
-
-    const d = fecha instanceof Date ? fecha : new Date(fecha);
-
-    if(isNaN(d.getTime())) return "";
-
-    return fechaLocalISO(d) + "T"
-        + String(d.getHours()).padStart(2, "0") + ":"
-        + String(d.getMinutes()).padStart(2, "0");
-
-}
+/* ==========================================
+   HORA (0-23) DE UNA FECHA
+========================================== */
 
 function horaDeFecha(fecha){
 
     const d = fecha instanceof Date ? fecha : new Date(fecha);
 
     return d.getHours();
-
-}
-
-/* ==========================================
-   ARCHIVOS (exportar)
-========================================== */
-
-function descargarArchivo(nombre, contenido, tipo){
-
-    const blob = new Blob([contenido], { type: tipo || "text/plain;charset=utf-8" });
-
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-
-    a.href = url;
-    a.download = nombre;
-
-    document.body.appendChild(a);
-
-    a.click();
-
-    a.remove();
-
-    setTimeout(()=> URL.revokeObjectURL(url), 2000);
-
-}
-
-/* Arma un CSV que Excel abre directo (separador ; y acentos bien). */
-function generarCSV(filas){
-
-    const celda = (v) =>{
-
-        let texto = v === null || v === undefined ? "" : String(v);
-
-        if(typeof v === "number") texto = String(v).replace(".", ",");
-
-        if(/[";\n\r]/.test(texto)) texto = '"' + texto.replace(/"/g, '""') + '"';
-
-        return texto;
-
-    };
-
-    return "﻿" + filas.map(f => f.map(celda).join(";")).join("\r\n");
-
-}
-
-/* ==========================================
-   IMPRESIÓN
-   Imprime solo el contenido indicado (por
-   ejemplo un comprobante o el reporte de caja).
-========================================== */
-
-function imprimirHtml(html, clase){
-
-    let zona = document.getElementById("zonaImpresion");
-
-    if(!zona){
-
-        zona = document.createElement("div");
-
-        zona.id = "zonaImpresion";
-
-        document.body.appendChild(zona);
-
-    }
-
-    zona.className = clase || "";
-
-    zona.innerHTML = html;
-
-    document.body.classList.add("imprimiendo");
-
-    // La zona de impresión solo existe para la impresora (en pantalla
-    // nunca se ve), así que se limpia recién cuando el sistema avisa
-    // que terminó: mientras el cuadro de impresión está abierto todavía
-    // la necesita.
-    const terminar = ()=>{
-
-        document.body.classList.remove("imprimiendo");
-
-        zona.innerHTML = "";
-
-        window.removeEventListener("afterprint", terminar);
-
-    };
-
-    window.addEventListener("afterprint", terminar);
-
-    setTimeout(()=> window.print(), 50);
-
-}
-
-/* ==========================================
-   SONIDO (se genera con el navegador, no
-   necesita ningún archivo)
-========================================== */
-
-function reproducirSonidoVenta(){
-
-    try{
-
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-
-        if(!Ctx) return;
-
-        const ctx = new Ctx();
-
-        [880, 1320].forEach((freq, i) =>{
-
-            const osc = ctx.createOscillator();
-
-            const gain = ctx.createGain();
-
-            osc.type = "sine";
-
-            osc.frequency.value = freq;
-
-            const inicio = ctx.currentTime + i * 0.11;
-
-            gain.gain.setValueAtTime(0.0001, inicio);
-
-            gain.gain.exponentialRampToValueAtTime(0.2, inicio + 0.02);
-
-            gain.gain.exponentialRampToValueAtTime(0.0001, inicio + 0.2);
-
-            osc.connect(gain).connect(ctx.destination);
-
-            osc.start(inicio);
-
-            osc.stop(inicio + 0.22);
-
-        });
-
-        setTimeout(()=> ctx.close().catch(()=>{}), 800);
-
-    }catch(e){ /* sin sonido, no pasa nada */ }
 
 }

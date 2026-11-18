@@ -7,13 +7,13 @@
    (fecha desde/hasta + texto libre)
 ========================================== */
 
+/* Layout fijo en dos filas, igual que el Historial: nunca se reordena
+   ni se envuelve, los campos solo achican/agrandan su ancho. */
 .gastosBuscador{
 
     display:flex;
 
-    flex-wrap:wrap;
-
-    align-items:end;
+    flex-direction:column;
 
     gap:15px;
 
@@ -28,6 +28,54 @@
     border:1px solid rgba(0,0,0,.06);
 
     box-shadow:0 12px 35px rgba(0,0,0,.05);
+
+}
+
+/* Fila 1: Desde / Hasta, con Buscar/Hoy/Todos pegados al borde derecho
+   a la par de las fechas. */
+.gastosFiltrosFecha{
+
+    display:flex;
+
+    flex-wrap:nowrap;
+
+    align-items:end;
+
+    gap:15px;
+
+}
+
+.gastosFiltrosFecha .grupoInput{
+
+    flex:0 0 auto;
+
+}
+
+/* Fila 2: solo el buscador de texto (estirado) y el botón de agregar,
+   pegado al borde derecho. */
+.gastosFiltrosBuscar{
+
+    display:flex;
+
+    flex-wrap:nowrap;
+
+    align-items:end;
+
+    gap:15px;
+
+}
+
+.gastosAcciones{
+
+    display:flex;
+
+    align-items:end;
+
+    gap:12px;
+
+    flex:0 0 auto;
+
+    margin-left:auto;
 
 }
 
@@ -87,9 +135,9 @@
 
 .gastosBuscador .grupoInputBuscarTexto{
 
-    flex:1;
+    flex:1 1 auto;
 
-    min-width:220px;
+    min-width:0;
 
 }
 
@@ -103,15 +151,29 @@
 
     height:48px;
 
-    margin-left:auto;
+}
+
+/* Mismo truco que el buscador: una etiqueta invisible arriba del botón
+   para que ambos tengan la misma estructura (label + control de 48px)
+   y queden alineados sin depender de cálculos de cross-axis. */
+.gastosAgregarWrap{
+
+    flex:0 0 auto;
+
+}
+
+.gastosAgregarWrap label{
+
+    visibility:hidden;
 
 }
 
 @media(max-width:900px){
 
-    .gastosBuscador{
+    .gastosFiltrosFecha,
+    .gastosFiltrosBuscar{
 
-        flex-direction:column;
+        flex-wrap:wrap;
 
         align-items:stretch;
 
@@ -124,9 +186,9 @@
 
     }
 
-    .gastosBuscador .btnAgregar{
+    .gastosAcciones{
 
-        margin-left:0;
+        flex-wrap:wrap;
 
     }
 
