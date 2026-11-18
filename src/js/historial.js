@@ -410,6 +410,12 @@ function htmlVentaHistorial(venta){
                 <div class="totalVenta">
                     <span>TOTAL</span>
                     <strong>${dinero(venta.total)}</strong>
+                    ${esAdmin() ? `<button
+                        class="btnEditarVenta"
+                        title="Editar venta"
+                        onclick="editarVenta('${venta.id}')">
+                        ✏️
+                    </button>` : ""}
                     <button
                         class="btnEliminarVenta"
                         title="Eliminar venta"

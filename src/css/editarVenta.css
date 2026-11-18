@@ -1,0 +1,103 @@
+/* ==========================================
+   EDITAR VENTA (modal del administrador)
+   Archivo aparte: no modifica ningún estilo
+   existente, solo agrega los del editor.
+========================================== */
+
+.modalEditarVentaContenido{
+    max-width:860px;
+    width:100%;
+}
+
+.evFila{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+    gap:0 16px;
+}
+
+.evTabla{
+    border-radius:10px;
+    overflow:auto;
+    margin-bottom:12px;
+}
+
+.evTabla table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.evTabla th,
+.evTabla td{
+    padding:8px 10px;
+    text-align:left;
+    vertical-align:middle;
+    border-bottom:1px solid rgba(128,128,128,.25);
+}
+
+.evInputChico{
+    width:96px !important;
+    display:inline-block !important;
+    margin:0 6px 0 0 !important;
+}
+
+.evAgregar{
+    display:grid;
+    grid-template-columns:2fr 1fr 1fr auto;
+    gap:10px;
+    align-items:center;
+}
+
+.evAgregar select,
+.evAgregar input{
+    margin:0 !important;
+}
+
+.evTotal{
+    text-align:right;
+    font-size:18px;
+    margin:16px 0;
+}
+
+.evTotal strong{
+    font-size:24px;
+}
+
+.evTresCampos{
+    display:flex;
+    gap:8px;
+}
+
+.evNota{
+    font-size:13px;
+    opacity:.8;
+    min-height:18px;
+}
+
+.evCheck{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin:10px 0;
+}
+
+.evCheck input{
+    width:auto !important;
+    margin:0 !important;
+}
+
+.btnEditarVenta{
+    width:40px;
+    height:40px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    background:#e3f2fd;
+    color:#1565c0;
+    transition:.25s;
+}
+
+.btnEditarVenta:hover{
+    background:#1565c0;
+    color:white;
+    transform:scale(1.08);
+}

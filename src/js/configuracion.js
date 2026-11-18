@@ -878,7 +878,14 @@ function guardarUsuarioAdmin(){
 
         u.rol = rol;
 
-        if(password) u.password = password;
+        if(password){
+
+            u.password = password;
+
+            delete u.hash;
+            delete u.sal;
+
+        }
 
         notificacion("Usuario actualizado.");
 
@@ -970,7 +977,7 @@ function cambiarPassword(){
 
     const repetir = document.getElementById("passwordRepetir").value;
 
-    if(actual !== usuarioActual.password){
+    if(!passwordCorrecta(usuarioActual, actual)){
 
         notificacion("La contraseña actual es incorrecta.", "error");
 
@@ -995,6 +1002,9 @@ function cambiarPassword(){
     }
 
     usuarioActual.password = nueva;
+
+    delete usuarioActual.hash;
+    delete usuarioActual.sal;
 
     guardarUsuarios();
 
