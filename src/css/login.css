@@ -10,42 +10,60 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    background:linear-gradient(135deg,#0f9d58 0%,#0a7d46 100%);
+    background:
+        radial-gradient(circle at 15% 20%, rgba(74,155,110,.35), transparent 45%),
+        radial-gradient(circle at 85% 80%, rgba(212,163,78,.18), transparent 45%),
+        linear-gradient(160deg, var(--verde) 0%, var(--verdeHover) 100%);
 
 }
 
 .loginCaja{
 
+    position:relative;
     background:#fff;
     width:min(92vw,380px);
-    padding:36px 30px;
-    border-radius:18px;
-    box-shadow:0 20px 60px rgba(0,0,0,.25);
+    padding:38px 32px 32px;
+    border-radius:var(--radio-lg);
+    box-shadow:var(--sombra-4);
     text-align:center;
-    animation:loginAparecer .5s ease;
+    animation:loginAparecer .5s var(--ease);
+    overflow:hidden;
+
+}
+
+.loginCaja::before{
+
+    content:"";
+    position:absolute;
+    top:0;
+    left:0;
+    right:0;
+    height:5px;
+    background:linear-gradient(90deg, var(--verde), var(--trigo));
 
 }
 
 @keyframes loginAparecer{
 
-    from{opacity:0;transform:translateY(20px) scale(.97)}
+    from{opacity:0;transform:translateY(16px) scale(.97)}
     to{opacity:1;transform:translateY(0) scale(1)}
 
 }
 
 .loginCaja .loginLogo{
 
+    font-family:var(--fuente-display);
     font-size:26px;
-    font-weight:800;
-    letter-spacing:1px;
-    color:#0a7d46;
+    font-weight:600;
+    letter-spacing:1.5px;
+    color:var(--verde);
     margin-bottom:6px;
 
 }
 
 .loginCaja .loginSub{
 
-    color:#777;
+    color:var(--color-texto-claro);
     font-size:14px;
     margin-bottom:22px;
 
@@ -56,7 +74,8 @@
     display:block;
     text-align:left;
     font-size:13px;
-    color:#555;
+    font-weight:600;
+    color:var(--color-texto-secundario);
     margin:12px 0 5px;
 
 }
@@ -65,18 +84,18 @@
 
     width:100%;
     padding:11px 12px;
-    border:1px solid #ccc;
-    border-radius:10px;
+    border:1.5px solid var(--color-borde);
+    border-radius:var(--radio-chico);
     font-size:15px;
     outline:none;
-    transition:border-color .2s,box-shadow .2s;
+    transition:border-color var(--rapido),box-shadow var(--rapido);
 
 }
 
 .loginCaja input:focus{
 
-    border-color:#0f9d58;
-    box-shadow:0 0 0 3px rgba(15,157,88,.15);
+    border-color:var(--verde);
+    box-shadow:0 0 0 3.5px rgba(31,93,58,.13);
 
 }
 
@@ -86,19 +105,21 @@
     width:100%;
     padding:12px;
     border:0;
-    border-radius:10px;
-    background:#0f9d58;
+    border-radius:var(--radio-boton);
+    background:var(--verde);
     color:#fff;
     font-size:16px;
     font-weight:600;
     cursor:pointer;
-    transition:background .2s,transform .1s;
+    box-shadow:0 4px 14px rgba(31,93,58,.28);
+    transition:background var(--rapido),transform var(--rapido),box-shadow var(--rapido);
 
 }
 
 .loginCaja button[type="submit"]:hover{
 
-    background:#0c8a4d;
+    background:var(--verdeHover);
+    box-shadow:0 6px 18px rgba(31,93,58,.34);
 
 }
 
@@ -110,7 +131,7 @@
 
 .loginError{
 
-    color:#d33;
+    color:var(--rojo);
     font-size:13px;
     min-height:18px;
     margin-top:12px;
@@ -143,14 +164,24 @@
     color:#fff;
     border:0;
     padding:8px;
-    border-radius:8px;
+    border-radius:var(--radio-chico);
     cursor:pointer;
-    transition:background .2s;
+    transition:background var(--rapido);
 
 }
 
 .btnCerrarSesion:hover{
 
-    background:rgba(255,0,0,.35);
+    background:rgba(193,68,58,.45);
 
+}
+
+/* Nombres de negocio largos en el menú lateral (Configuración > Negocio) */
+body .sidebar .logo.logoLargo{
+    font-size: 17px;
+    letter-spacing: 1px;
+    line-height: 1.2;
+    text-align: center;
+    padding-left: 10px;
+    padding-right: 10px;
 }

@@ -6,13 +6,14 @@
 
     position: fixed;
     inset: 0;
-    background: rgba(20, 40, 30, 0.55);
+    background: rgba(31, 26, 20, 0.5);
+    backdrop-filter: blur(2px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
     padding: 20px;
-    animation: fadeIn 0.18s ease;
+    animation: fadeIn 0.2s var(--ease);
 
 }
 
@@ -26,21 +27,22 @@
 .modalContenido{
 
     background: var(--color-blanco);
-    border-radius: var(--radio);
+    border-radius: var(--radio-lg);
     padding: 28px;
     width: 100%;
     max-width: 520px;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
-    animation: slideUp 0.22s ease;
+    box-shadow: var(--sombra-4);
+    animation: modalEntra 0.26s var(--ease);
+    transform-origin: center;
 
 }
 
-@keyframes slideUp{
+@keyframes modalEntra{
 
-    from { transform: translateY(24px); opacity: 0; }
-    to   { transform: translateY(0);    opacity: 1; }
+    from { transform: translateY(14px) scale(.97); opacity: 0; }
+    to   { transform: translateY(0) scale(1);    opacity: 1; }
 
 }
 
@@ -52,10 +54,12 @@
 
 .modalContenido h2{
 
-    font-size: 20px;
+    font-family: var(--fuente-display);
+    font-size: 21px;
+    letter-spacing:.2px;
     color: var(--color-primario-osc);
     margin-bottom: 20px;
-    font-weight: 700;
+    font-weight: 600;
 
 }
 

@@ -14,9 +14,16 @@ function renderDashboard(){
 
     // Las ventas "DEBE" (fiado) todavía no se cobraron, no se suman
     // como plata del día.
-    const totalVentasHoy = ventasHoy
-        .filter(v => v.metodoPago !== "debe")
-        .reduce((acc,v)=>acc+Number(v.total||0),0);
+    const ventasHoyCobradas = ventasHoy.filter(v => v.metodoPago !== "debe");
+
+    // Cobros de deuda de clientes (fiados pagados hoy): esta plata entró
+    // hoy aunque la venta original sea de otro día, así que también
+    // cuenta como plata real del día de hoy.
+    const cobrosHoy = clientes.flatMap(c => c.pagos || [])
+        .filter(p => fechaLocalISO(p.fecha) === hoy);
+
+    const totalVentasHoy = ventasHoyCobradas.reduce((acc,v)=>acc+Number(v.total||0),0)
+        + cobrosHoy.reduce((acc,p)=>acc+Number(p.monto||0),0);
 
     const totalGastos = gastos.reduce((acc,g)=>acc+Number(g.monto||0),0);
 
@@ -82,7 +89,7 @@ function renderDashboard(){
         <div class="cardMetrica">
             <small>💰 Ventas de hoy</small>
             <h2>${dinero(totalVentasHoy)}</h2>
-            <span class="subMetrica">${ventasHoy.length} ventas</span>
+            <span class="subMetrica">${ventasHoyCobradas.length} ventas + ${cobrosHoy.length} cobros de deuda</span>
         </div>
 
         <div class="cardMetrica">

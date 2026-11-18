@@ -147,22 +147,11 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
     };
 
+    // El Enter para confirmar este modal (y los demás) lo maneja el
+    // listener global de más abajo; acá solo queda la vista previa en vivo.
     const inputCantidad = document.getElementById("inputCantidad");
 
     if(inputCantidad){
-
-        inputCantidad.addEventListener("keydown", (e)=>{
-
-            if(e.key === "Enter"){
-
-                e.preventDefault();
-                e.stopPropagation();
-
-                confirmarCantidad();
-
-            }
-
-        });
 
         inputCantidad.addEventListener("input", ()=>{
 
@@ -176,43 +165,87 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
     }
 
-    // Enter en el modal de pago de cliente.
-    const montoPago = document.getElementById("montoPagoCliente");
+});
 
-    if(montoPago){
+/* ==========================================
+   ENTER / ESC EN MODALES
+   ------------------------------------------
+   Todos los modales siguen la misma estructura
+   (.modal > .modalContenido > .accionesModal con
+   un .btnGuardar y un .btnCancelar), así que un
+   solo listener alcanza para los 15 y pico que
+   hay en vez de cablear cada uno a mano:
+   - Enter confirma (clickea el .btnGuardar).
+   - Esc cancela (clickea el .btnCancelar, o si el
+     modal no tiene uno, simplemente lo cierra).
+========================================== */
 
-        montoPago.addEventListener("keydown", (e)=>{
+document.addEventListener("keydown", (e)=>{
 
-            if(e.key === "Enter"){
+    if(e.key !== "Enter" && e.key !== "Escape") return;
 
-                e.preventDefault();
+    const modalAbierto = document.querySelector(".modal:not(.oculto)");
 
-                guardarPagoCliente();
+    if(e.key === "Escape"){
+
+        // Con un modal abierto, el Esc es para ÉL primero (cancela sin
+        // tocar la pantalla de detalle que pueda haber debajo).
+        if(modalAbierto){
+
+            e.preventDefault();
+
+            const btnCancelar = modalAbierto.querySelector(".btnCancelar");
+
+            if(btnCancelar){
+
+                btnCancelar.click();
+
+            }else{
+
+                cerrar(modalAbierto.id);
 
             }
 
-        });
+            return;
+
+        }
+
+        // Sin modal: Esc es "Volver" en cualquier pantalla de detalle
+        // (Cliente, Proveedor, Mezcla, Anotación, etc.), igual que el
+        // botón ← Volver de arriba.
+        const pantallaAbierta = document.querySelector(".pantallaDetalle:not(.oculto)");
+
+        const btnVolver = pantallaAbierta && pantallaAbierta.querySelector(".btnVolver");
+
+        if(btnVolver){
+
+            e.preventDefault();
+
+            btnVolver.click();
+
+        }
+
+        return;
 
     }
 
-    // Enter en el modal de precio de cliente.
-    const precioKgCliente = document.getElementById("precioKgCliente");
+    if(!modalAbierto) return;
 
-    if(precioKgCliente){
+    // Enter: en un textarea tiene que seguir agregando un salto de línea
+    // (ej: notas), no disparar el guardado del modal entero. Y si el foco
+    // ya está en un botón (Cancelar, + Agregar ingrediente, etc.) se deja
+    // que el Enter nativo lo active a ÉL, no al Guardar de otro lado.
+    const activo = document.activeElement;
 
-        precioKgCliente.addEventListener("keydown", (e)=>{
+    if(activo && (activo.tagName === "TEXTAREA" || activo.tagName === "BUTTON")) return;
 
-            if(e.key === "Enter"){
+    const btnGuardar = modalAbierto.querySelector(".btnGuardar");
 
-                e.preventDefault();
+    if(!btnGuardar || btnGuardar.disabled) return;
 
-                guardarPrecioCliente();
+    e.preventDefault();
 
-            }
-
-        });
-
-    }
+    btnGuardar.click();
 
 });
 

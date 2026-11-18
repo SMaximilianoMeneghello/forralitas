@@ -36,40 +36,57 @@ function renderGastos(){
 
         <div class="gastosBuscador">
 
-            <div class="grupoInput">
-                <label>Desde</label>
-                <input type="date" id="fechaDesdeGasto">
+            <div class="gastosFiltrosFecha">
+
+                <div class="grupoInput">
+                    <label>Desde</label>
+                    <input type="date" id="fechaDesdeGasto">
+                </div>
+
+                <div class="grupoInput">
+                    <label>Hasta</label>
+                    <input type="date" id="fechaHastaGasto">
+                </div>
+
+                <div class="gastosAcciones">
+
+                    <button class="btnBuscar" id="btnBuscarGasto">Buscar</button>
+
+                    <button class="btnHoy" id="btnHoyGasto">Hoy</button>
+
+                    <button class="btnTodas" id="btnTodasGasto">Todos</button>
+
+                </div>
+
             </div>
 
-            <div class="grupoInput">
-                <label>Hasta</label>
-                <input type="date" id="fechaHastaGasto">
+            <div class="gastosFiltrosBuscar">
+
+                <div class="grupoInput grupoInputBuscarTexto">
+                    <label>Buscar</label>
+                    <input
+                        type="text"
+                        id="buscarTextoGasto"
+                        placeholder="Descripción o categoría..."
+                        autocomplete="off">
+                </div>
+
+                <div class="grupoInput gastosAgregarWrap">
+                    <label aria-hidden="true">&nbsp;</label>
+                    <button
+                        id="btnAgregarGasto"
+                        class="btnAgregar">
+
+                        + Agregar gasto
+
+                    </button>
+                </div>
+
             </div>
-
-            <div class="grupoInput grupoInputBuscarTexto">
-                <label>Buscar</label>
-                <input
-                    type="text"
-                    id="buscarTextoGasto"
-                    placeholder="Descripción o categoría..."
-                    autocomplete="off">
-            </div>
-
-            <button class="btnBuscar" id="btnBuscarGasto">Buscar</button>
-
-            <button class="btnHoy" id="btnHoyGasto">Hoy</button>
-
-            <button class="btnTodas" id="btnTodasGasto">Todos</button>
-
-            <button
-                id="btnAgregarGasto"
-                class="btnAgregar">
-
-                + Agregar gasto
-
-            </button>
 
         </div>
+
+        ${mjBarraGastos()}
 
         <div class="card">
 
@@ -158,6 +175,8 @@ function buscarGastos(){
 }
 
 function actualizarTablaGastos(desde = null, hasta = null, texto = ""){
+
+    mjResumirGastos();
 
     const tbody = document.getElementById("tablaGastosBody");
 
@@ -420,7 +439,7 @@ function guardarGasto(){
 
     }
 
-    guardarDatos();
+    guardarDatos("gastos");
 
     cerrarModalGasto();
 
@@ -455,7 +474,7 @@ function eliminarGasto(id){
 
             );
 
-            guardarDatos();
+            guardarDatos("gastos");
 
             refrescarTablaGastosConFiltrosActuales();
 

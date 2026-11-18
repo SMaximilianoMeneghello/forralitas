@@ -553,7 +553,7 @@ function guardarMezcla(){
 
     }
 
-    guardarDatos();
+    guardarDatos("mezclas");
 
     cerrarModalMezcla();
 
@@ -589,7 +589,7 @@ function eliminarMezcla(id){
 
             );
 
-            guardarDatos();
+            guardarDatos("mezclas");
 
             actualizarTablaMezclas();
 

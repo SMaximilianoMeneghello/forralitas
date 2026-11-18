@@ -23,6 +23,20 @@ let productoSeleccionado = null;
 
 let paginaActual = "dashboard";
 
+// Único lugar que decide el orden de "productos": así cualquier buscador
+// o listado que lo recorra (tabla de Productos, venta, mezclas, ingreso
+// de stock, etc.) ya lo recibe alfabético sin tener que ordenar cada uno
+// por su cuenta.
+function ordenarProductosPorNombre(lista){
+
+    return [...(lista || [])].sort((a, b) =>
+
+        (a.nombre || "").localeCompare(b.nombre || "", "es", { sensitivity: "base" })
+
+    );
+
+}
+
 /* ==========================================
    TABLAS QUE SE SINCRONIZAN CON FIREBASE
    (el carrito queda solo local: es la venta en
@@ -30,7 +44,7 @@ let paginaActual = "dashboard";
 ========================================== */
 
 const ENTIDADES_SINCRONIZADAS = [
-    { nombre: "productos", obtener: () => productos, asignar: v => productos = v },
+    { nombre: "productos", obtener: () => productos, asignar: v => productos = ordenarProductosPorNombre(v) },
     { nombre: "clientes", obtener: () => clientes, asignar: v => clientes = v },
     { nombre: "proveedores", obtener: () => proveedores, asignar: v => proveedores = v },
     { nombre: "gastos", obtener: () => gastos, asignar: v => gastos = v },
@@ -83,6 +97,8 @@ function iniciarAppLogueada(){
     mostrarUsuarioActual();
 
     abrirDashboard();
+
+    iniciarMonitorTransferenciasMP();
 
 }
 
@@ -178,7 +194,7 @@ async function cargarDatos(){
 
     // Copia local: sirve de respaldo si no hay internet y hace que la
     // app abra al instante mientras se consulta a Firebase.
-    productos = JSON.parse(localStorage.getItem("productos")) || [];
+    productos = ordenarProductosPorNombre(JSON.parse(localStorage.getItem("productos")) || []);
 
     clientes = JSON.parse(localStorage.getItem("clientes")) || [];
 
@@ -290,34 +306,50 @@ function refrescarPantallaActual(){
    GUARDAR
 ========================================== */
 
-function guardarDatos(){
+// El carrito es la única tabla que NO se sincroniza con Firebase (ver
+// ENTIDADES_SINCRONIZADAS): es la venta en curso de esta computadora.
+const CLAVES_LOCALES = {
+    productos: () => productos,
+    clientes: () => clientes,
+    proveedores: () => proveedores,
+    gastos: () => gastos,
+    historialVentas: () => historialVentas,
+    eliminaciones: () => eliminaciones,
+    mezclas: () => mezclas,
+    carpetasNotas: () => carpetasNotas,
+    carrito: () => carrito
+};
 
-    // Respaldo local instantáneo (por si se corta internet).
-    localStorage.setItem("productos", JSON.stringify(productos));
+// Sin argumentos guarda TODO (comportamiento de siempre: el respaldo
+// seguro para cualquier llamado que no se haya revisado todavía). Pasando
+// nombres puntuales ("productos", "historialVentas", etc.) solo se
+// reescribe esa tabla en localStorage/Firebase en vez de las 9 enteras,
+// que es lo que de verdad cambió en la acción que llamó a guardar.
+function guardarDatos(...nombres){
 
-    localStorage.setItem("clientes", JSON.stringify(clientes));
+    const guardarTodo = nombres.length === 0;
 
-    localStorage.setItem("proveedores", JSON.stringify(proveedores));
+    const aGuardar = guardarTodo ? Object.keys(CLAVES_LOCALES) : nombres;
 
-    localStorage.setItem("gastos", JSON.stringify(gastos));
+    aGuardar.forEach(nombre =>{
 
-    localStorage.setItem("historialVentas", JSON.stringify(historialVentas));
+        const obtener = CLAVES_LOCALES[nombre];
 
-    localStorage.setItem("eliminaciones", JSON.stringify(eliminaciones));
+        if(obtener) localStorage.setItem(nombre, JSON.stringify(obtener()));
 
-    localStorage.setItem("mezclas", JSON.stringify(mezclas));
-
-    localStorage.setItem("carpetasNotas", JSON.stringify(carpetasNotas));
-
-    localStorage.setItem("carrito", JSON.stringify(carrito));
+    });
 
     if(!window.FirebaseDB) return;
 
-    ENTIDADES_SINCRONIZADAS.forEach(ent =>{
+    ENTIDADES_SINCRONIZADAS
 
-        window.FirebaseDB.guardarColeccion(ent.nombre, ent.obtener());
+        .filter(ent => guardarTodo || aGuardar.includes(ent.nombre))
 
-    });
+        .forEach(ent =>{
+
+            window.FirebaseDB.guardarColeccion(ent.nombre, ent.obtener());
+
+        });
 
 }
 
@@ -359,6 +391,9 @@ function iniciarEventos(){
 function cambiarPagina(nombre){
 
     paginaActual = nombre;
+
+    // Si hubo una vista previa de tema sin guardar, vuelve al tema guardado.
+    if(typeof aplicarTema === "function") aplicarTema();
 
     document
         .querySelectorAll(".sidebar button")

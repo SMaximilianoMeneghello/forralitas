@@ -20,10 +20,12 @@
     }
 }
 
+/* Layout fijo en dos filas, pensado para el ancho mínimo de la ventana
+   (ver minWidth en electron/main.js): nunca se reordena ni se envuelve,
+   los campos solo achican/agrandan su ancho según el espacio disponible. */
 .historialBuscador{
     display:flex;
-    flex-wrap:wrap;
-    align-items:end;
+    flex-direction:column;
     gap:15px;
 
     padding:20px;
@@ -38,6 +40,39 @@
     0 12px 35px rgba(0,0,0,.05);
 }
 
+/* Fila 1: Desde / Hasta / Desde la hora / Empleado, siempre los cuatro
+   en una sola línea, repartiéndose el ancho en partes iguales. */
+.historialFiltrosFecha{
+    display:flex;
+    flex-wrap:nowrap;
+    align-items:end;
+    gap:15px;
+}
+
+.historialFiltrosFecha .grupoInput{
+
+    flex:1 1 0;
+    min-width:0;
+
+}
+
+/* Fila 2: el buscador se estira para ocupar el espacio libre y los
+   botones de acción quedan pegados al borde derecho, siempre juntos. */
+.historialFiltrosBuscar{
+    display:flex;
+    flex-wrap:nowrap;
+    align-items:end;
+    gap:15px;
+}
+
+.historialAcciones{
+    display:flex;
+    align-items:end;
+    gap:12px;
+
+    flex:0 0 auto;
+}
+
 .historialBuscador label{
     font-size:.9rem;
     font-weight:700;
@@ -45,10 +80,18 @@
     margin:0;
 }
 
+/* Hay un ".grupoInput{margin-bottom:...}" sin alcance (modales.css,
+   configuracion.css) que se filtra acá y desalinea los botones contra
+   el buscador (align-items:end termina alineando el margen, no el
+   recuadro visible). Se anula para esta barra. */
+.historialBuscador .grupoInput{
+    margin-bottom:0;
+}
+
 .historialBuscador input,
 .historialBuscador select{
 
-    width:220px;
+    width:100%;
     height:48px;
 
     padding:0 15px;
@@ -77,15 +120,9 @@
 
 .historialBuscador .grupoInputBuscarTexto{
 
-    flex:1;
+    flex:1 1 auto;
 
-    min-width:220px;
-
-}
-
-.historialBuscador .grupoInputBuscarTexto input{
-
-    width:100%;
+    min-width:0;
 
 }
 
@@ -201,8 +238,6 @@
 
     display:flex;
 
-    justify-content:space-between;
-
     align-items:center;
 
     gap:15px;
@@ -224,6 +259,65 @@
 .cardVentaCabecera small{
 
     opacity:.9;
+}
+
+/* El bloque del medio (botones) se centra solo, dejando cliente/fecha
+   pegados a la izquierda y vendedor pegado a la derecha. */
+.infoClienteVenta{
+
+    margin-right:auto;
+}
+
+.infoVendedorVenta{
+
+    margin-left:auto;
+
+    white-space:nowrap;
+}
+
+.accionesCabeceraVenta{
+
+    display:flex;
+
+    gap:8px;
+
+    flex-wrap:wrap;
+
+    justify-content:center;
+}
+
+.accionesCabeceraVenta .btnComanda,
+.accionesCabeceraVenta .btnTicketCliente{
+
+    height:30px;
+
+    padding:0 12px;
+
+    border:none;
+
+    border-radius:999px;
+
+    cursor:pointer;
+
+    font-weight:700;
+
+    font-size:12px;
+
+    white-space:nowrap;
+
+    background:rgba(255,255,255,.2);
+
+    color:white;
+
+    transition:.2s;
+}
+
+.accionesCabeceraVenta .btnComanda:hover,
+.accionesCabeceraVenta .btnTicketCliente:hover{
+
+    background:rgba(255,255,255,.35);
+
+    transform:scale(1.05);
 }
 
 .cardVentaInfo{
@@ -344,6 +438,8 @@
 
     align-items:center;
 
+    flex-wrap:wrap;
+
     gap:15px;
 
     padding:22px;
@@ -409,9 +505,26 @@ align-items:flex-start;
 
 }
 
+.infoClienteVenta,
+.infoVendedorVenta{
+
+margin:0;
+
+}
+
+.accionesCabeceraVenta{
+
+margin-top:4px;
+
+justify-content:flex-start;
+
+}
+
 .totalVenta{
 
 justify-content:space-between;
+
+flex-wrap:wrap;
 
 }
 
@@ -421,24 +534,26 @@ font-size:22px;
 
 }
 
-.historialBuscador{
+.historialFiltrosFecha,
+.historialFiltrosBuscar{
 
-flex-direction:column;
+flex-wrap:wrap;
 
 align-items:stretch;
 
 }
 
-.historialBuscador input,
-.historialBuscador select{
+.historialFiltrosFecha .grupoInput{
 
-width:100%;
+flex:1 1 160px;
 
 }
 
-.btnHoy{
+.btnHoy,
+.btnBuscar,
+.btnTodas{
 
-width:100%;
+flex:1;
 
 }
 

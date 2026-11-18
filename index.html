@@ -8,9 +8,13 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-    <meta name="theme-color" content="#2e7d32">
+    <meta name="theme-color" content="#1F5D3A">
 
     <title>FORRALITAS APP</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- CSS GENERAL -->
     <link rel="stylesheet" href="./src/css/style.css">
@@ -29,12 +33,20 @@
     <link rel="stylesheet" href="./src/css/historial.css">
     <link rel="stylesheet" href="./src/css/reportes.css">
     <link rel="stylesheet" href="./src/css/configuracion.css">
+    <link rel="stylesheet" href="./src/css/configuracion-pestanas.css">
 
     <!-- MODALES -->
     <link rel="stylesheet" href="./src/css/modales.css">
 
     <!-- LOGIN -->
     <link rel="stylesheet" href="./src/css/login.css">
+
+    <!-- TEMA FUTURO (siempre al final: capa visual sobre la paleta) -->
+    <link rel="stylesheet" href="./src/css/tema-futuro.css">
+    <link rel="stylesheet" href="./src/css/calendario.css">
+    <link rel="stylesheet" href="./src/css/selects.css">
+    <link rel="stylesheet" href="./src/css/editarVenta.css">
+    <link rel="stylesheet" href="./src/css/mejoras.css">
 
 </head>
 
@@ -403,6 +415,55 @@
 </div>
 
 <!-- ========================================== -->
+<!-- MODAL COBRO CON POINT SMART -->
+<!-- ========================================== -->
+
+<div
+    id="modalPointSmart"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2>📟 Cobrando con Point Smart</h2>
+
+        <p id="textoPointSmart">Esperando a que el cliente pague en el dispositivo...</p>
+
+        <p class="previewCantidad" id="montoPointSmart"></p>
+
+        <div class="accionesModal">
+            <button onclick="cancelarCobroPointSmart()" class="btnCancelar">Cancelar cobro</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL ESPERA DE TRANSFERENCIA (MERCADO PAGO) -->
+<!-- ========================================== -->
+
+<div
+    id="modalEsperaTransferencia"
+    class="modal oculto">
+
+    <div class="modalContenido modalPequeño">
+
+        <h2>🔔 Esperando transferencia</h2>
+
+        <p id="textoEsperaTransferencia">Esperando a que se acredite la transferencia en Mercado Pago...</p>
+
+        <p class="previewCantidad" id="montoEsperaTransferencia"></p>
+
+        <div class="accionesModal">
+            <button onclick="confirmarSinEsperarTransferenciaMP()" class="btnGuardar">Registrar sin esperar</button>
+            <button onclick="cancelarEsperaTransferenciaMP()" class="btnCancelar">Cancelar</button>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ========================================== -->
 <!-- MODAL PRECIO PRODUCTO (CLIENTE) -->
 <!-- ========================================== -->
 
@@ -456,7 +517,7 @@
         </div>
 
         <div class="grupoInput">
-            <label>Venta a la que se aplica el pago</label>
+            <label>Deudas que se saldan (de la más antigua a la más nueva)</label>
             <div id="listaVentasPendientesPago" class="listaVentasPendientesPago">
                 <!-- se llena dinámicamente -->
             </div>
@@ -940,10 +1001,12 @@
 
 <script type="module" src="./src/js/firebase/firebase-init.js"></script>
 <script src="./src/js/ui/ui.js"></script>
+<script src="./src/js/negocio.js"></script>
 <script src="./src/js/auth/auth.js"></script>
 <script src="./src/js/app.js"></script>
 <script src="./src/js/dashboard.js"></script>
 <script src="./src/js/productos.js"></script>
+<script src="./src/js/ticket.js"></script>
 <script src="./src/js/modules/ventas.js"></script>
 <script src="./src/js/clientes.js"></script>
 <script src="./src/js/clienteDetalle.js"></script>
@@ -957,6 +1020,11 @@
 <script src="./src/js/historial.js"></script>
 <script src="./src/js/reportes.js"></script>
 <script src="./src/js/configuracion.js"></script>
+<script src="./src/js/efectos.js"></script>
+<script src="./src/js/calendario.js"></script>
+<script src="./src/js/selects.js"></script>
+<script src="./src/js/editarVenta.js"></script>
+<script src="./src/js/mejoras.js"></script>
 
 </body>
 

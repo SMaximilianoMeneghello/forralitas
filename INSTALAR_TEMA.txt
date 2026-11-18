@@ -1,0 +1,46 @@
+FORRALITAS — TEMA MODERN UI
+===========================
+
+Este parche NO cambia ventas, Firebase, stock ni datos.
+Solo agrega un CSS maestro cargado al final para modernizar y hacer responsive la interfaz.
+
+INSTALACION MANUAL
+------------------
+1. Copiar:
+   src/css/forralitas-modern.css
+
+   dentro de la carpeta de tu proyecto:
+   FORRALITAS/src/css/
+
+2. Abrir index.html.
+
+3. Buscar esta linea:
+   <link rel="stylesheet" href="./src/css/login.css">
+
+4. Justo ABAJO agregar:
+   <link rel="stylesheet" href="./src/css/forralitas-modern.css">
+
+5. Guardar y abrir la app.
+
+PARA VOLVER AL DISEÑO ANTERIOR
+------------------------------
+Simplemente eliminar o comentar esta linea del index.html:
+<link rel="stylesheet" href="./src/css/forralitas-modern.css">
+
+POR QUE SE CARGA AL FINAL
+-------------------------
+La app tiene distintos CSS por modulo. Al cargar este archivo ultimo actua como tema maestro y unifica el diseño sin tener que modificar cada archivo existente.
+
+DISEÑADO PARA
+-------------
+- Windows con escala 100%, 125% y 150%.
+- Resoluciones de notebook, Full HD y pantallas grandes.
+- Cambios de tamaño de ventana.
+- Tablas grandes con scroll horizontal cuando realmente hace falta.
+- Pantallas con poca altura.
+- Modales que no se salen de la pantalla.
+- El nuevo modulo "Ingresos de productos" del parche v1.0.11.
+
+IMPORTANTE
+----------
+Probar primero sobre una copia del proyecto antes de generar el instalador definitivo.

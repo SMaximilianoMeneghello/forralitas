@@ -35,6 +35,8 @@ function renderClientes(){
 
         </div>
 
+        ${mjBarraClientes()}
+
         <div class="card">
 
             <div class="tablaClientes">
@@ -108,13 +110,13 @@ function actualizarTablaClientes(){
 
     tbody.innerHTML = "";
 
-    const listaFiltrada = !filtroClientes
+    const listaFiltrada = mjFiltrarClientes(!filtroClientes
         ? clientes
         : clientes.filter(c =>
             (c.nombre || "").toLowerCase().includes(filtroClientes)
             || (c.direccion || "").toLowerCase().includes(filtroClientes)
             || (c.telefono || "").toLowerCase().includes(filtroClientes)
-        );
+        ));
 
     if(clientes.length === 0){
 
@@ -282,11 +284,14 @@ function guardarCliente(){
 
     }
 
-    guardarDatos();
+    guardarDatos("clientes");
 
     cerrarModalCliente();
 
     actualizarTablaClientes();
+
+    // Si se editó desde la ficha del cliente, la ficha se actualiza.
+    mjRefrescarClienteYProductos();
 
     clienteEditandoId = null;
 
@@ -306,6 +311,12 @@ function eliminarCliente(id){
 
             clientes = clientes.filter(c => c.id !== id);
 
+            // Se guardan sus precios especiales junto con el cliente, por si
+            // el administrador lo restaura desde Eliminaciones.
+            const copiaCliente = JSON.parse(JSON.stringify(cliente));
+
+            copiaCliente.preciosEspeciales = obtenerPreciosCliente(id);
+
             // Se eliminan también los precios personalizados del cliente.
             eliminarPreciosCliente(id);
 
@@ -316,11 +327,11 @@ function eliminarCliente(id){
                 "Cliente " + cliente.nombre
                 + (cliente.telefono ? " · " + cliente.telefono : ""),
 
-                cliente
+                copiaCliente
 
             );
 
-            guardarDatos();
+            guardarDatos("clientes");
 
             actualizarTablaClientes();
 

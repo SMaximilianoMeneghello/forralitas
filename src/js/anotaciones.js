@@ -271,7 +271,7 @@ function guardarCarpetaNota(){
 
     }
 
-    guardarDatos();
+    guardarDatos("carpetasNotas");
 
     cerrarModalCarpetaNota();
 
@@ -305,7 +305,7 @@ function eliminarCarpetaNota(id){
 
             );
 
-            guardarDatos();
+            guardarDatos("carpetasNotas");
 
             actualizarTablaAnotaciones();
 
@@ -379,7 +379,7 @@ function guardarTextoAnotacion(id){
     carpeta.actualizadoISO = ahora.toISOString();
     carpeta.actualizadoTexto = fechaHoraTexto(ahora);
 
-    guardarDatos();
+    guardarDatos("carpetasNotas");
 
     const nota = document.getElementById("notaGuardadoAnotacion");
 

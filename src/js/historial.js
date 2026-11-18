@@ -14,52 +14,66 @@ function renderHistorial(){
 
             <div class="historialBuscador">
 
-                <div class="grupoInput">
-                    <label>Desde</label>
-                    <input type="date" id="fechaDesdeHistorial">
+                <div class="historialFiltrosFecha">
+
+                    <div class="grupoInput">
+                        <label>Desde</label>
+                        <input type="date" id="fechaDesdeHistorial">
+                    </div>
+
+                    <div class="grupoInput">
+                        <label>Hasta</label>
+                        <input type="date" id="fechaHastaHistorial">
+                    </div>
+
+                    <div class="grupoInput">
+                        <label>Desde la hora</label>
+                        <select id="horaDesdeHistorial">
+                            <option value="">Cualquier hora</option>
+                            ${Array.from({ length: 24 }, (_, h) =>
+                                `<option value="${h}">${String(h).padStart(2,"0")}:00</option>`
+                            ).join("")}
+                        </select>
+                    </div>
+
+                    <div class="grupoInput">
+                        <label>Empleado</label>
+                        <select id="empleadoHistorial">
+                            <option value="">Todos los empleados</option>
+                            ${opcionesEmpleados}
+                        </select>
+                    </div>
+
                 </div>
 
-                <div class="grupoInput">
-                    <label>Hasta</label>
-                    <input type="date" id="fechaHastaHistorial">
+                <div class="historialFiltrosBuscar">
+
+                    <div class="grupoInput grupoInputBuscarTexto">
+                        <label>Buscar</label>
+                        <input
+                            type="text"
+                            id="buscarTextoHistorial"
+                            placeholder="Cliente o producto..."
+                            autocomplete="off">
+                    </div>
+
+                    <div class="historialAcciones">
+
+                        <button class="btnBuscar" id="btnBuscarHistorial">
+                            Buscar
+                        </button>
+
+                        <button class="btnHoy" id="btnHoyHistorial">Hoy</button>
+
+                        <button class="btnTodas" id="btnTodasHistorial">Todas</button>
+
+                    </div>
+
                 </div>
-
-                <div class="grupoInput">
-                    <label>Desde la hora</label>
-                    <select id="horaDesdeHistorial">
-                        <option value="">Cualquier hora</option>
-                        ${Array.from({ length: 24 }, (_, h) =>
-                            `<option value="${h}">${String(h).padStart(2,"0")}:00</option>`
-                        ).join("")}
-                    </select>
-                </div>
-
-                <div class="grupoInput">
-                    <label>Empleado</label>
-                    <select id="empleadoHistorial">
-                        <option value="">Todos los empleados</option>
-                        ${opcionesEmpleados}
-                    </select>
-                </div>
-
-                <div class="grupoInput grupoInputBuscarTexto">
-                    <label>Buscar</label>
-                    <input
-                        type="text"
-                        id="buscarTextoHistorial"
-                        placeholder="Cliente o producto..."
-                        autocomplete="off">
-                </div>
-
-                <button class="btnBuscar" id="btnBuscarHistorial">
-                    Buscar
-                </button>
-
-                <button class="btnHoy" id="btnHoyHistorial">Hoy</button>
-
-                <button class="btnTodas" id="btnTodasHistorial">Todas</button>
 
             </div>
+
+            ${mjBarraHistorial()}
 
             <div id="listaHistorialVentas"></div>
 
@@ -89,6 +103,10 @@ filtrarTodasHistorial();
    alguna venta, más los usuarios cargados)
 ========================================== */
 
+// "Maxi (Administrador)" es el mismo Maxi (solo el login admin) y Derna
+// ya no se usa como filtro: se ocultan de la lista a pedido.
+const EMPLEADOS_OCULTOS_FILTRO = ["Derna", "Maxi (Administrador)"];
+
 function obtenerListaEmpleadosParaFiltro(){
 
     const nombres = new Set();
@@ -104,6 +122,8 @@ function obtenerListaEmpleadosParaFiltro(){
         if(u.nombre) nombres.add(u.nombre);
 
     });
+
+    EMPLEADOS_OCULTOS_FILTRO.forEach(nombre => nombres.delete(nombre));
 
     return Array.from(nombres).sort((a,b)=> a.localeCompare(b));
 
@@ -273,6 +293,9 @@ function renderListaHistorial(desde, hasta, texto = "", horaDesde = "", empleado
 
     }
 
+    // Filtro por forma de pago y totales (ver mejoras.js).
+    ventas = mjFiltrarYResumirHistorial(ventas);
+
     if(ventas.length === 0){
 
         cont.innerHTML = `
@@ -287,7 +310,51 @@ function renderListaHistorial(desde, hasta, texto = "", horaDesde = "", empleado
 
     }
 
-    cont.innerHTML = ventas.map(venta =>{
+    // Se dibujan de a 50 (con 2.800 ventas, dibujar todas juntas hacía
+    // que la pantalla tardara mucho en abrir).
+    historialFiltrado = ventas;
+
+    historialVisibles = HISTORIAL_POR_PAGINA;
+
+    dibujarHistorialVisible();
+
+}
+
+const HISTORIAL_POR_PAGINA = 50;
+
+let historialFiltrado = [];
+
+let historialVisibles = HISTORIAL_POR_PAGINA;
+
+function dibujarHistorialVisible(){
+
+    const cont = document.getElementById("listaHistorialVentas");
+
+    if(!cont) return;
+
+    const visibles = historialFiltrado.slice(0, historialVisibles);
+
+    const quedan = historialFiltrado.length - visibles.length;
+
+    cont.innerHTML = visibles.map(htmlVentaHistorial).join("")
+        + (quedan > 0
+            ? `<div class="card" style="text-align:center">
+                   <p style="margin-bottom:10px">Mostrando ${visibles.length} de ${historialFiltrado.length} ventas.</p>
+                   <button class="btnBuscar" onclick="verMasHistorial()">Ver ${Math.min(quedan, HISTORIAL_POR_PAGINA)} más</button>
+               </div>`
+            : "");
+
+}
+
+function verMasHistorial(){
+
+    historialVisibles += HISTORIAL_POR_PAGINA;
+
+    dibujarHistorialVisible();
+
+}
+
+function htmlVentaHistorial(venta){
 
         const filas = venta.productos.map(item => `
             <tr>
@@ -310,11 +377,25 @@ function renderListaHistorial(desde, hasta, texto = "", horaDesde = "", empleado
         return `
             <div class="cardVentaHistorial">
                 <div class="cardVentaCabecera">
-                    <div>
+                    <div class="infoClienteVenta">
                         <h3>${cliente}</h3>
                         <small>${venta.fechaTexto}</small>
                     </div>
-                    <small>👤 ${vendedor}</small>
+                    <div class="accionesCabeceraVenta">
+                        <button
+                            class="btnComanda"
+                            title="Imprimir comanda (sin precios, para armar el pedido)"
+                            onclick="imprimirComandaVentaPorId('${venta.id}')">
+                            🧾 Comanda
+                        </button>
+                        <button
+                            class="btnTicketCliente"
+                            title="Imprimir una copia del ticket para el cliente"
+                            onclick="imprimirTicketClienteVentaPorId('${venta.id}')">
+                            🎫 Ticket cliente
+                        </button>
+                    </div>
+                    <small class="infoVendedorVenta">👤 ${vendedor}</small>
                 </div>
                 <div class="cardVentaInfo">
                     <span class="badgePago">${textoMetodoPago(venta)}</span>
@@ -334,6 +415,12 @@ function renderListaHistorial(desde, hasta, texto = "", horaDesde = "", empleado
                 <div class="totalVenta">
                     <span>TOTAL</span>
                     <strong>${dinero(venta.total)}</strong>
+                    ${esAdmin() ? `<button
+                        class="btnEditarVenta"
+                        title="Editar venta"
+                        onclick="editarVenta('${venta.id}')">
+                        ✏️
+                    </button>` : ""}
                     <button
                         class="btnEliminarVenta"
                         title="Eliminar venta"
@@ -344,7 +431,42 @@ function renderListaHistorial(desde, hasta, texto = "", horaDesde = "", empleado
             </div>
         `;
 
-    }).join("");
+
+}
+
+/* ==========================================
+   COMANDA / TICKET CLIENTE
+========================================== */
+
+function imprimirComandaVentaPorId(id){
+
+    const venta = historialVentas.find(v => v.id === id);
+
+    if(!venta){
+
+        notificacion("No se encontró esa venta.", "warning");
+
+        return;
+
+    }
+
+    imprimirComandaVenta(venta);
+
+}
+
+function imprimirTicketClienteVentaPorId(id){
+
+    const venta = historialVentas.find(v => v.id === id);
+
+    if(!venta){
+
+        notificacion("No se encontró esa venta.", "warning");
+
+        return;
+
+    }
+
+    imprimirTicketClienteVenta(venta);
 
 }
 
@@ -362,11 +484,31 @@ function eliminarVentaHistorial(id){
 
         "¿Eliminar la venta del "
         + (venta.fechaTexto || "fecha desconocida")
-        + " por " + dinero(venta.total) + "?",
+        + " por " + dinero(venta.total) + "? Se devuelve el stock"
+        + (mjPendienteReal(venta) > 0 ? " y se descuenta del saldo del cliente lo que debía de esta venta (" + dinero(mjPendienteReal(venta)) + ")" : "")
+        + ".",
 
         ()=>{
 
             historialVentas = historialVentas.filter(v => v.id !== id);
+
+            // Si era fiada, se descuenta del saldo del cliente lo que debía
+            // de esta venta y se quitan sus pagos (ver mejoras.js).
+            const deuda = mjQuitarDeudaDeVenta(venta);
+
+            // Se devuelve al stock lo que se había descontado al cargar
+            // cada producto de la venta (ver ventas.js > confirmarCantidad).
+            (venta.productos || []).forEach(item =>{
+
+                const producto = productos.find(p => p.id === item.id);
+
+                if(producto){
+
+                    producto.stock = Number(producto.stock || 0) + Number(item.bolsas || 0);
+
+                }
+
+            });
 
             registrarEliminacion(
 
@@ -376,11 +518,25 @@ function eliminarVentaHistorial(id){
                 + ((venta.cliente && venta.cliente.nombre) ? venta.cliente.nombre : "Consumidor Final")
                 + " · " + dinero(venta.total),
 
-                venta
+                // Copia completa para poder restaurarla desde Eliminaciones.
+                {
+                    ...JSON.parse(JSON.stringify(venta)),
+                    stockDevuelto: true,
+                    saldoDescontado: deuda.saldoDescontado,
+                    pagosEliminados: deuda.pagosEliminados
+                }
 
             );
 
-            guardarDatos();
+            guardarDatos("historialVentas", "productos", "clientes");
+
+            mjRefrescarClienteYProductos();
+
+            if(paginaActual === "Productos"){
+
+                actualizarTablaProductos();
+
+            }
 
             const desde = document.getElementById("fechaDesdeHistorial")?.value || null;
 

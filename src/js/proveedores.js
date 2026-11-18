@@ -351,7 +351,7 @@ function guardarProveedor(){
 
     }
 
-    guardarDatos();
+    guardarDatos("proveedores");
 
     cerrarModalProveedor();
 
@@ -386,7 +386,7 @@ function eliminarProveedor(id){
 
             );
 
-            guardarDatos();
+            guardarDatos("proveedores");
 
             actualizarTablaProveedores();
 

@@ -219,6 +219,15 @@
 
 }
 
+/* Resaltado por teclado (flechitas arriba/abajo), no solo por mouse. */
+.itemBusquedaProducto.activo{
+
+    background:#e5f5e7;
+
+    box-shadow:inset 3px 0 0 var(--verde);
+
+}
+
 .itemBusquedaProducto strong{
 
     color:#222;
@@ -687,6 +696,66 @@
     border-color:var(--verde);
 
     box-shadow:0 0 0 4px rgba(46,125,50,.12);
+
+}
+
+.pagoMixto select{
+
+    height:42px;
+
+    padding:0 10px;
+
+    border:2px solid #e5e7eb;
+
+    border-radius:10px;
+
+    font-size:14px;
+
+}
+
+.accionPointSmart{
+
+    display:flex;
+
+    align-items:center;
+
+    margin-left:10px;
+
+}
+
+.accionPointSmart button{
+
+    height:42px;
+
+    padding:0 16px;
+
+    border-radius:10px;
+
+    font-weight:700;
+
+}
+
+.accionesTarjetaPoint{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+}
+
+.notaAccionPago{
+
+    margin:0;
+
+    font-size:12.5px;
+
+    font-weight:600;
+
+    color:#2e7d32;
+
+    max-width:220px;
 
 }
 

@@ -1,0 +1,698 @@
+/* ==========================================
+   FORRALITAS · TEMA FUTURO
+   ------------------------------------------
+   Capa visual que se carga al final. No cambia
+   estructura ni lógica: suma profundidad (vidrio,
+   brillos), movimiento fluido y respuesta al
+   cursor. Todos los colores salen de las variables
+   del tema (Configuración > Apariencia), así que
+   cualquier paleta que se elija se ve completa.
+========================================== */
+
+:root{
+
+    --vidrio: color-mix(in srgb, #ffffff 72%, transparent);
+    --vidrio-borde: color-mix(in srgb, #ffffff 70%, transparent);
+
+    /* Posición del cursor dentro de cada elemento (lo escribe efectos.js) */
+    --mx: 50%;
+    --my: 50%;
+
+    --sombra-tabla: 0 1px 2px rgba(20,30,24,.05), 0 14px 34px color-mix(in srgb, var(--verde) 12%, transparent);
+    --sombra-tabla-hover: 0 2px 4px rgba(20,30,24,.06), 0 24px 52px color-mix(in srgb, var(--verde) 22%, transparent);
+
+
+}
+
+/* ==========================================
+   FONDO VIVO
+========================================== */
+
+.principal{
+    position:relative;
+    overflow:hidden;
+    background:var(--color-fondo);
+}
+
+.principal::before{
+
+    content:"";
+    position:absolute;
+    inset:-15%;
+    pointer-events:none;
+    z-index:0;
+    background:
+        radial-gradient(40% 40% at 18% 22%, color-mix(in srgb, var(--verde-brote) 22%, transparent), transparent 70%),
+        radial-gradient(38% 38% at 82% 18%, color-mix(in srgb, var(--trigo) 24%, transparent), transparent 70%),
+        radial-gradient(45% 45% at 70% 88%, color-mix(in srgb, var(--verde) 14%, transparent), transparent 70%);
+    filter:blur(30px);
+    animation:auroraMover 24s ease-in-out infinite alternate;
+
+}
+
+.principal::after{
+
+    content:"";
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    z-index:0;
+    background-image:
+        linear-gradient(color-mix(in srgb, var(--verde) 4%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--verde) 4%, transparent) 1px, transparent 1px);
+    background-size:44px 44px;
+    -webkit-mask-image:radial-gradient(ellipse at center, #000 35%, transparent 80%);
+            mask-image:radial-gradient(ellipse at center, #000 35%, transparent 80%);
+
+}
+
+#contenidoPrincipal{
+    position:relative;
+    z-index:1;
+    background:transparent;
+}
+
+/* ==========================================
+   SIDEBAR
+========================================== */
+
+.sidebar{
+    position:relative;
+    background:linear-gradient(175deg, var(--sidebar-1, var(--verde)) 0%, var(--sidebar-2, var(--verde)) 45%, var(--sidebar-3, var(--verde)) 100%);
+    overflow:hidden;
+}
+
+.sidebar::before{
+
+    content:"";
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    background-image:
+        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+    background-size:28px 28px;
+    -webkit-mask-image:linear-gradient(180deg, #000, transparent 85%);
+            mask-image:linear-gradient(180deg, #000, transparent 85%);
+
+}
+
+.sidebar::after{
+
+    content:"";
+    position:absolute;
+    top:-40%;
+    left:-60%;
+    width:60%;
+    height:180%;
+    pointer-events:none;
+    background:linear-gradient(100deg, transparent, rgba(255,255,255,.07), transparent);
+    transform:rotate(12deg);
+    animation:barridoLateral 9s ease-in-out infinite;
+
+}
+
+.sidebar > *{
+    position:relative;
+    z-index:1;
+}
+
+.logo{
+    background:linear-gradient(90deg, #ffffff 0%, var(--trigo-suave) 35%, var(--trigo) 50%, var(--trigo-suave) 65%, #ffffff 100%);
+    background-size:220% auto;
+    -webkit-background-clip:text;
+            background-clip:text;
+    color:transparent;
+    text-shadow:none;
+    filter:drop-shadow(0 0 12px color-mix(in srgb, var(--trigo) 30%, transparent));
+    animation:brilloLogo 6s linear infinite;
+    letter-spacing:3px;
+}
+
+.sidebar button{
+    transition:background .25s var(--ease), color .25s var(--ease), padding .25s var(--ease), transform .25s var(--ease);
+    border-radius:0 12px 12px 0;
+    margin-right:10px;
+    animation:entrarMenu .5s var(--ease) both;
+}
+
+.sidebar button:nth-of-type(1){ animation-delay:.04s; }
+.sidebar button:nth-of-type(2){ animation-delay:.08s; }
+.sidebar button:nth-of-type(3){ animation-delay:.12s; }
+.sidebar button:nth-of-type(4){ animation-delay:.16s; }
+.sidebar button:nth-of-type(5){ animation-delay:.20s; }
+.sidebar button:nth-of-type(6){ animation-delay:.24s; }
+.sidebar button:nth-of-type(7){ animation-delay:.28s; }
+.sidebar button:nth-of-type(8){ animation-delay:.32s; }
+.sidebar button:nth-of-type(9){ animation-delay:.36s; }
+
+.sidebar button:hover{
+    transform:translateX(3px);
+    background:rgba(255,255,255,.1);
+}
+
+.sidebar button.activo{
+    background:linear-gradient(90deg, color-mix(in srgb, var(--trigo) 28%, transparent), rgba(255,255,255,.06));
+    box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--trigo) 38%, transparent), 0 0 22px color-mix(in srgb, var(--trigo) 20%, transparent);
+    color:#fff;
+}
+
+.sidebar button.activo::before{
+    background:linear-gradient(180deg, var(--trigo-suave), var(--trigo));
+    box-shadow:0 0 10px var(--trigo);
+}
+
+#usuarioActualUI{
+    margin-top:auto;
+}
+
+/* ==========================================
+   CABECERA DE VIDRIO
+========================================== */
+
+.cabecera{
+    position:relative;
+    z-index:20;
+    background:var(--vidrio);
+    -webkit-backdrop-filter:blur(14px) saturate(140%);
+            backdrop-filter:blur(14px) saturate(140%);
+    border-bottom:1px solid color-mix(in srgb, var(--verde) 8%, transparent);
+    box-shadow:0 8px 24px color-mix(in srgb, var(--verde) 6%, transparent);
+}
+
+.cabecera::after{
+
+    content:"";
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:-1px;
+    height:2px;
+    background:linear-gradient(90deg, transparent, var(--trigo), var(--verde-brote), transparent);
+    background-size:200% 100%;
+    opacity:.6;
+    animation:brilloLinea 5s linear infinite;
+
+}
+
+.cabecera h1{
+    background:linear-gradient(90deg, var(--verde), var(--verde-brote) 60%, var(--verde));
+    background-size:200% auto;
+    -webkit-background-clip:text;
+            background-clip:text;
+    color:transparent;
+    animation:brilloLogo 9s linear infinite;
+}
+
+/* ==========================================
+   TARJETAS DE VIDRIO
+========================================== */
+
+.card{
+    position:relative;
+    background:var(--vidrio);
+    -webkit-backdrop-filter:blur(10px);
+            backdrop-filter:blur(10px);
+    border:1px solid var(--vidrio-borde);
+    border-radius:var(--radio);
+    box-shadow:0 1px 2px rgba(20,30,24,.04), 0 12px 32px color-mix(in srgb, var(--verde) 7%, transparent);
+    animation:entrarSuave .55s var(--ease) both;
+    transition:box-shadow .35s var(--ease), background .35s var(--ease), transform .35s var(--ease);
+}
+
+
+
+#contenidoPrincipal > *{
+    animation:entrarSuave .5s var(--ease) both;
+}
+
+/* Métricas: quietas, solo cambian el resplandor */
+.cardMetrica{
+    position:relative;
+    overflow:hidden;
+    border-radius:var(--radio);
+}
+
+.cardMetrica h2{
+    background:linear-gradient(135deg, var(--verde), var(--verde-brote));
+    -webkit-background-clip:text;
+            background-clip:text;
+    color:transparent;
+}
+
+/* ==========================================
+   TABLAS REDONDEADAS
+   Cada tabla va dentro de un contenedor que
+   recorta las esquinas, da sombra y se levanta
+   al pasar el mouse. overflow:auto conserva el
+   scroll horizontal donde hace falta.
+========================================== */
+
+table{
+    border-collapse:separate;
+    border-spacing:0;
+}
+
+div:has(> table):not(.card):not(.cardMetrica){
+    position:relative;
+    border-radius:var(--radio);
+    overflow:auto;
+    background:var(--vidrio);
+    border:1px solid var(--vidrio-borde);
+    box-shadow:var(--sombra-tabla);
+    transition:transform .4s var(--ease), box-shadow .4s var(--ease), background .4s var(--ease);
+}
+
+
+div:has(> table) thead th{
+    position:sticky;
+    top:0;
+    z-index:2;
+    background:linear-gradient(180deg, var(--verde), var(--verdeHover));
+    color:#fff;
+    font-weight:700;
+    letter-spacing:.3px;
+    border:none;
+}
+
+div:has(> table) thead th:first-child{ border-top-left-radius:var(--radio); }
+div:has(> table) thead th:last-child{ border-top-right-radius:var(--radio); }
+
+div:has(> table) tbody tr{
+    animation:entrarFila .45s var(--ease) both;
+    transition:background .25s ease, transform .25s var(--ease);
+}
+
+div:has(> table) tbody tr td{
+    border-bottom:1px solid color-mix(in srgb, var(--verde) 7%, transparent);
+    transition:background .25s ease;
+}
+
+div:has(> table) tbody tr:last-child td{
+    border-bottom:none;
+}
+
+/* Fila: resalta en verde suave */
+div:has(> table) tbody tr:hover td{
+    background:var(--verde-suave) !important;
+}
+
+/* ==========================================
+   BOTONES
+========================================== */
+
+button{
+    position:relative;
+    overflow:hidden;
+    transition:transform .18s var(--ease), box-shadow .25s var(--ease), background .25s var(--ease), color .25s var(--ease), opacity .25s var(--ease), translate .35s var(--ease);
+}
+
+button:active{
+    transform:scale(.96);
+}
+
+.btnGuardar{
+    background:linear-gradient(135deg, var(--verde) 0%, var(--verde-brote) 100%);
+    box-shadow:0 6px 18px color-mix(in srgb, var(--verde) 28%, transparent), inset 0 1px 0 rgba(255,255,255,.18);
+}
+
+.btnGuardar::after{
+
+    content:"";
+    position:absolute;
+    top:0;
+    left:-80%;
+    width:50%;
+    height:100%;
+    background:linear-gradient(120deg, transparent, rgba(255,255,255,.35), transparent);
+    transform:skewX(-20deg);
+    transition:left .7s var(--ease);
+    pointer-events:none;
+
+}
+
+.btnGuardar:hover::after{
+    left:140%;
+}
+
+.btnGuardar:hover{
+    box-shadow:0 10px 26px color-mix(in srgb, var(--verde) 36%, transparent), 0 0 0 4px color-mix(in srgb, var(--verde-brote) 14%, transparent);
+    transform:translateY(-1px);
+}
+
+.btnCancelar{
+    background:rgba(237,234,226,.85);
+}
+
+/* Onda al hacer clic (la crea efectos.js) */
+.efectoRipple{
+    position:absolute;
+    width:14px;
+    height:14px;
+    border-radius:50%;
+    background:rgba(255,255,255,.55);
+    transform:translate(-50%,-50%) scale(0);
+    pointer-events:none;
+    animation:rippleAnim .7s ease-out forwards;
+}
+
+@keyframes rippleAnim{
+
+    to{ transform:translate(-50%,-50%) scale(30); opacity:0; }
+
+}
+
+/* ==========================================
+   CAMPOS
+========================================== */
+
+input,
+select,
+textarea{
+    transition:border-color .25s var(--ease), box-shadow .25s var(--ease), background .25s var(--ease);
+}
+
+input:focus,
+select:focus,
+textarea:focus{
+    border-color:var(--verde-brote) !important;
+    box-shadow:0 0 0 4px color-mix(in srgb, var(--verde-brote) 16%, transparent);
+    outline:none;
+}
+
+::selection{
+    background:color-mix(in srgb, var(--trigo) 35%, transparent);
+    color:var(--texto);
+}
+
+/* ==========================================
+   MODALES
+========================================== */
+
+.modal:not(.oculto){
+    background:rgba(20,30,24,.42);
+    -webkit-backdrop-filter:blur(8px);
+            backdrop-filter:blur(8px);
+    animation:fundoModal .3s ease both;
+}
+
+.modalContenido{
+    animation:modalEntra .42s var(--ease) both;
+    border:1px solid var(--vidrio-borde);
+    border-radius:var(--radio);
+    box-shadow:0 30px 70px rgba(20,40,28,.28), 0 0 0 1px color-mix(in srgb, var(--trigo) 14%, transparent);
+}
+
+/* ==========================================
+   SCROLLBARS
+========================================== */
+
+::-webkit-scrollbar{
+    width:10px;
+    height:10px;
+}
+
+::-webkit-scrollbar-track{
+    background:transparent;
+}
+
+::-webkit-scrollbar-thumb{
+    background:color-mix(in srgb, var(--verde) 24%, transparent);
+    border-radius:10px;
+    border:2px solid transparent;
+    background-clip:content-box;
+}
+
+::-webkit-scrollbar-thumb:hover{
+    background:color-mix(in srgb, var(--trigo) 60%, transparent);
+    background-clip:content-box;
+}
+
+/* ==========================================
+   LOGIN
+========================================== */
+
+#pantallaLogin{
+    overflow:hidden;
+}
+
+#pantallaLogin::before{
+
+    content:"";
+    position:absolute;
+    inset:-20%;
+    pointer-events:none;
+    background:
+        radial-gradient(35% 35% at 25% 30%, color-mix(in srgb, var(--trigo) 22%, transparent), transparent 70%),
+        radial-gradient(35% 35% at 75% 70%, color-mix(in srgb, var(--verde-brote) 30%, transparent), transparent 70%);
+    filter:blur(40px);
+    animation:auroraMover 18s ease-in-out infinite alternate;
+
+}
+
+.loginCaja{
+    position:relative;
+    z-index:1;
+    background:var(--vidrio);
+    -webkit-backdrop-filter:blur(16px);
+            backdrop-filter:blur(16px);
+    border:1px solid var(--vidrio-borde);
+    box-shadow:0 30px 60px rgba(0,0,0,.18), 0 0 0 1px color-mix(in srgb, var(--trigo) 16%, transparent);
+    animation:entrarSuave .7s var(--ease) both;
+}
+
+.loginLogo{
+    background:linear-gradient(90deg, var(--verde), var(--trigo), var(--verde-brote), var(--verde));
+    background-size:250% auto;
+    -webkit-background-clip:text;
+            background-clip:text;
+    color:transparent;
+    animation:brilloLogo 7s linear infinite, flotar 5s ease-in-out infinite;
+}
+
+/* ==========================================
+   EFECTOS DEL CURSOR
+   Los atributos y variables los pone efectos.js.
+   Al apagarlos desde Configuración, no queda nada.
+========================================== */
+
+[data-magnet]{
+    translate:var(--magX, 0px) var(--magY, 0px);
+    transition:translate .3s var(--ease), background .25s ease, box-shadow .25s ease;
+}
+
+body.efectos-off [data-magnet]{
+    translate:none !important;
+}
+
+body.efectos-off .efectoRipple{
+    display:none;
+}
+
+/* ==========================================
+   UTILIDADES
+========================================== */
+
+.oculto{
+    display:none !important;
+}
+
+/* ==========================================
+   ANIMACIONES
+========================================== */
+
+@keyframes auroraMover{
+
+    0%   { transform:translate3d(-3%, -2%, 0) scale(1); }
+    50%  { transform:translate3d(3%, 2%, 0) scale(1.05); }
+    100% { transform:translate3d(-2%, 3%, 0) scale(1.02); }
+
+}
+
+@keyframes brilloLogo{
+
+    from{ background-position:0% center; }
+    to  { background-position:220% center; }
+
+}
+
+@keyframes brilloLinea{
+
+    from{ background-position:0% 0; }
+    to  { background-position:200% 0; }
+
+}
+
+@keyframes barridoLateral{
+
+    0%, 60%{ left:-60%; opacity:0; }
+    70%    { opacity:1; }
+    100%   { left:130%; opacity:0; }
+
+}
+
+@keyframes entrarMenu{
+
+    from{ opacity:0; transform:translateX(-14px); }
+    to  { opacity:1; transform:translateX(0); }
+
+}
+
+@keyframes entrarSuave{
+
+    from{ opacity:0; }
+    to  { opacity:1; }
+
+}
+
+@keyframes entrarFila{
+
+    from{ opacity:0; }
+    to  { opacity:1; }
+
+}
+
+@keyframes fundoModal{
+
+    from{ opacity:0; }
+    to  { opacity:1; }
+
+}
+
+@keyframes modalEntra{
+
+    from{ opacity:0; transform:translateY(18px) scale(.94); }
+    to  { opacity:1; transform:translateY(0) scale(1); }
+
+}
+
+@keyframes flotar{
+
+    0%, 100%{ transform:translateY(0); }
+    50%     { transform:translateY(-4px); }
+
+}
+
+/* ==========================================
+   QUIETO: solo los botones se mueven
+   Tarjetas, tablas y filas no cambian de lugar
+   al pasar el mouse (solo se marcan con una
+   sombra suave, en verde neutro).
+========================================== */
+
+.card:hover,
+.cardMetrica:hover,
+.cardConfig:hover,
+.cardVentaHistorial:hover,
+div:has(> table):hover,
+tr:hover,
+.tablaProductos tbody tr:hover{
+    transform:none !important;
+}
+
+.card:hover,
+.cardMetrica:hover,
+.cardConfig:hover,
+.cardVentaHistorial:hover{
+    box-shadow:var(--sombra-quieta) !important;
+    background:var(--vidrio) !important;
+}
+
+:root{
+    --sombra-quieta: 0 1px 2px rgba(20,30,24,.05), 0 10px 26px rgba(20,30,24,.08);
+}
+
+/* Botones: sombra neutra al pasar el mouse (sin dorado ni marrón) */
+button:hover:not(.btnGuardar){
+    box-shadow:0 8px 18px rgba(20,30,24,.12) !important;
+}
+
+/* Buscadores desplegables (ventas): la lista va por encima de las tablas */
+.ventasSuperior{
+    position:relative;
+    z-index:60;
+}
+
+/* ==========================================
+   HISTORIAL DE VENTAS · COLORES DEL TEMA
+   Las tarjetas de venta usaban verde y azul
+   fijos; ahora salen de Configuración > Apariencia.
+========================================== */
+
+.cardVentaHistorial{
+    background:var(--vidrio) !important;
+    border:1px solid var(--color-borde) !important;
+    border-radius:var(--radio) !important;
+    box-shadow:var(--sombra-quieta) !important;
+}
+
+.cardVentaCabecera{
+    background:linear-gradient(135deg, var(--verde) 0%, var(--verde-brote) 100%) !important;
+    color:#fff;
+}
+
+.cardVentaCabecera h3,
+.cardVentaCabecera small{
+    color:#fff;
+}
+
+.badgePago{
+    background:var(--verde-suave) !important;
+    color:var(--verde) !important;
+}
+
+.cardVentaHistorial thead{
+    background:transparent !important;
+}
+
+.cardVentaHistorial th{
+    color:#fff !important;
+    background:linear-gradient(180deg, var(--verde), var(--verdeHover)) !important;
+}
+
+.cardVentaHistorial td{
+    border-top:1px solid color-mix(in srgb, var(--verde) 7%, transparent) !important;
+}
+
+.totalVenta strong{
+    color:var(--verde) !important;
+}
+
+.totalVenta span{
+    color:var(--color-texto-secundario, #635C4E);
+}
+
+/* Botones de filtro (Buscar / Hoy / Todas): usan la paleta elegida */
+.btnBuscar{
+    background:linear-gradient(135deg, var(--verde), var(--verde-brote)) !important;
+    color:#fff;
+}
+
+.btnHoy{
+    background:linear-gradient(135deg, var(--verde-brote), var(--verde)) !important;
+    color:#fff;
+}
+
+.btnTodas{
+    background:linear-gradient(135deg, var(--trigo), var(--trigo-suave)) !important;
+    color:var(--texto);
+}
+
+/* Cabecera de cada venta: esquinas redondeadas como el resto de la tarjeta */
+.cardVentaCabecera{
+    border-radius:calc(var(--radio) - 4px) !important;
+}
+
+.badgePago{
+    border-radius:999px;
+}
+
+/* Buscadores con lista desplegable (ingresos, ventas, etc.):
+   la tarjeta que tiene el foco, o que muestra una lista abierta,
+   queda por encima de las demás para que la lista no se tape. */
+.card:focus-within,
+.card:has(.sugerenciasIngresoProductos:not(.oculto)),
+.card:has(.calendarioPop.visible){
+    z-index:60;
+}
+

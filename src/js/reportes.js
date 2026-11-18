@@ -2,6 +2,9 @@
    REPORTES
 ========================================== */
 
+// Las reservas por producto ("Separar Maíz", "Separar Alfa") se
+// configuran en Configuración > Negocio: ver src/js/negocio.js.
+
 function renderReportes(){
 
     const filtroEmpleadoHtml = esAdmin()
@@ -40,7 +43,13 @@ function renderReportes(){
 
                 <button class="btnHoy" id="btnHoyReporte">Hoy</button>
 
+                <button class="btnHoy" id="btnSemanaReporte">Semanal</button>
+
+                <button class="btnHoy" id="btnMesReporte">Mensual</button>
+
             </div>
+
+            <div id="selectorPeriodoReporte" class="reportesFiltros oculto"></div>
 
             ${
                 !esAdmin()
@@ -52,15 +61,26 @@ function renderReportes(){
                 : ""
             }
 
+            ${mjBarraCaja()}
+
             <div id="contenidoReporte"></div>
 
         </div>
 
     `;
 
-    document.getElementById("btnGenerarReporte").onclick = generarReporte;
+    document.getElementById("btnGenerarReporte").onclick = ()=>{
+
+        ocultarSelectorPeriodoReporte();
+        generarReporte();
+
+    };
 
     document.getElementById("btnHoyReporte").onclick = filtrarHoyReporte;
+
+    document.getElementById("btnSemanaReporte").onclick = mostrarSelectorSemanaReporte;
+
+    document.getElementById("btnMesReporte").onclick = mostrarSelectorMesReporte;
 
     const hoy = fechaLocalISO(new Date());
 
@@ -74,11 +94,257 @@ function renderReportes(){
 
 function filtrarHoyReporte(){
 
+    ocultarSelectorPeriodoReporte();
+
     const hoy = fechaLocalISO(new Date());
 
     document.getElementById("fechaDesdeReporte").value = hoy;
 
     document.getElementById("fechaHastaReporte").value = hoy;
+
+    generarReporte();
+
+}
+
+/* ==========================================
+   FILTROS RÁPIDOS: SEMANAL Y MENSUAL
+   ------------------------------------------
+   Las semanas son de lunes a sábado (el negocio
+   no abre los domingos), semanas de calendario de
+   verdad, no un reparto fijo de días del mes. La
+   semana 1 de un mes es la semana (lunes a sábado)
+   que contiene el día 1, aunque ese lunes sea del
+   mes anterior; a partir de ahí se suman de a 7
+   días hasta cubrir todo el mes. Por eso un mes
+   puede tener 4, 5 o 6 "semanas" según cómo caiga.
+   "Semanal" y "Mensual" arrancan mostrando el
+   período que contiene la fecha de hoy, pero se
+   puede elegir otro mes/semana con los selectores
+   que aparecen.
+========================================== */
+
+// Lista de semanas (lunes a sábado) que tocan el mes dado, en orden.
+function semanasDelMes(anio, mesIndice){
+
+    const ultimoDiaMes = new Date(anio, mesIndice + 1, 0);
+
+    const diaUno = new Date(anio, mesIndice, 1);
+
+    // getDay(): 0 = domingo ... 6 = sábado. Retrocede hasta el lunes de
+    // esa misma semana (si el día 1 ya es lunes, se queda ahí).
+    const diasHastaLunes = (diaUno.getDay() + 6) % 7;
+
+    const lunes = new Date(anio, mesIndice, 1 - diasHastaLunes);
+
+    const semanas = [];
+
+    while(lunes <= ultimoDiaMes){
+
+        const sabado = new Date(lunes);
+        sabado.setDate(sabado.getDate() + 5);
+
+        semanas.push({ desde: new Date(lunes), hasta: sabado });
+
+        lunes.setDate(lunes.getDate() + 7);
+
+    }
+
+    return semanas;
+
+}
+
+// Qué semana (índice 1 en adelante, de la lista de semanasDelMes) le
+// corresponde a una fecha puntual, para resaltarla por defecto.
+function indiceSemanaPorFecha(semanas, fecha){
+
+    const indice = semanas.findIndex(s => fecha >= s.desde && fecha <= s.hasta);
+
+    return indice === -1 ? 0 : indice;
+
+}
+
+function etiquetaRangoSemana(semana){
+
+    const formato = f => f.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+
+    return formato(semana.desde) + " al " + formato(semana.hasta);
+
+}
+
+function rangoSemanaDelMes(anio, mesIndice, semana){
+
+    const semanas = semanasDelMes(anio, mesIndice);
+
+    const elegida = semanas[semana - 1] || semanas[0];
+
+    return {
+        desde: fechaLocalISO(elegida.desde),
+        hasta: fechaLocalISO(elegida.hasta)
+    };
+
+}
+
+function rangoMesCompleto(anio, mesIndice){
+
+    return {
+        desde: fechaLocalISO(new Date(anio, mesIndice, 1)),
+        hasta: fechaLocalISO(new Date(anio, mesIndice + 1, 0))
+    };
+
+}
+
+function capitalizarTexto(texto){
+
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+
+}
+
+// Últimos 12 meses (incluido el actual) para elegir en los selectores.
+function opcionesMesesReporte(){
+
+    const hoy = new Date();
+
+    const opciones = [];
+
+    for(let i = 0; i < 12; i++){
+
+        const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+
+        opciones.push({
+            valor: d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"),
+            anio: d.getFullYear(),
+            mesIndice: d.getMonth(),
+            etiqueta: capitalizarTexto(d.toLocaleDateString("es-AR", { month: "long", year: "numeric" }))
+        });
+
+    }
+
+    return opciones;
+
+}
+
+function ocultarSelectorPeriodoReporte(){
+
+    const cont = document.getElementById("selectorPeriodoReporte");
+
+    if(!cont) return;
+
+    cont.classList.add("oculto");
+    cont.innerHTML = "";
+
+}
+
+function mostrarSelectorSemanaReporte(){
+
+    const cont = document.getElementById("selectorPeriodoReporte");
+
+    if(!cont) return;
+
+    const opciones = opcionesMesesReporte();
+    const valorMesActual = opciones[0].valor;
+
+    cont.classList.remove("oculto");
+
+    cont.innerHTML = `
+        <div class="grupoInput">
+            <label>Mes</label>
+            <select id="mesSemanaReporte">
+                ${opciones.map(o => `<option value="${o.valor}">${o.etiqueta}</option>`).join("")}
+            </select>
+        </div>
+        <div class="grupoInput">
+            <label>Semana</label>
+            <select id="semanaReporte"></select>
+        </div>
+    `;
+
+    document.getElementById("mesSemanaReporte").value = valorMesActual;
+
+    document.getElementById("mesSemanaReporte").onchange = repoblarSemanasReporte;
+    document.getElementById("semanaReporte").onchange = aplicarSemanaSeleccionadaReporte;
+
+    repoblarSemanasReporte();
+
+}
+
+// Recalcula las semanas (lunes a sábado) del mes elegido en el selector
+// y las vuelve a listar: hace falta cada vez que cambia el mes porque la
+// cantidad de semanas y sus fechas dependen de cómo cae el 1° del mes.
+function repoblarSemanasReporte(){
+
+    const [anio, mes] = document.getElementById("mesSemanaReporte").value.split("-").map(Number);
+    const mesIndice = mes - 1;
+
+    const semanas = semanasDelMes(anio, mesIndice);
+
+    const hoy = new Date();
+    const esMesActual = anio === hoy.getFullYear() && mesIndice === hoy.getMonth();
+
+    const indiceDefault = esMesActual ? indiceSemanaPorFecha(semanas, hoy) : 0;
+
+    const select = document.getElementById("semanaReporte");
+
+    select.innerHTML = semanas
+
+        .map((s, i) => `<option value="${i + 1}">Semana ${i + 1} (${etiquetaRangoSemana(s)})</option>`)
+
+        .join("");
+
+    select.value = String(indiceDefault + 1);
+
+    aplicarSemanaSeleccionadaReporte();
+
+}
+
+function aplicarSemanaSeleccionadaReporte(){
+
+    const [anio, mes] = document.getElementById("mesSemanaReporte").value.split("-").map(Number);
+    const semana = Number(document.getElementById("semanaReporte").value);
+
+    const { desde, hasta } = rangoSemanaDelMes(anio, mes - 1, semana);
+
+    document.getElementById("fechaDesdeReporte").value = desde;
+    document.getElementById("fechaHastaReporte").value = hasta;
+
+    generarReporte();
+
+}
+
+function mostrarSelectorMesReporte(){
+
+    const cont = document.getElementById("selectorPeriodoReporte");
+
+    if(!cont) return;
+
+    const opciones = opcionesMesesReporte();
+    const valorMesActual = opciones[0].valor;
+
+    cont.classList.remove("oculto");
+
+    cont.innerHTML = `
+        <div class="grupoInput">
+            <label>Mes</label>
+            <select id="mesCompletoReporte">
+                ${opciones.map(o => `<option value="${o.valor}">${o.etiqueta}</option>`).join("")}
+            </select>
+        </div>
+    `;
+
+    document.getElementById("mesCompletoReporte").value = valorMesActual;
+    document.getElementById("mesCompletoReporte").onchange = aplicarMesSeleccionadoReporte;
+
+    aplicarMesSeleccionadoReporte();
+
+}
+
+function aplicarMesSeleccionadoReporte(){
+
+    const [anio, mes] = document.getElementById("mesCompletoReporte").value.split("-").map(Number);
+
+    const { desde, hasta } = rangoMesCompleto(anio, mes - 1);
+
+    document.getElementById("fechaDesdeReporte").value = desde;
+    document.getElementById("fechaHastaReporte").value = hasta;
 
     generarReporte();
 
@@ -154,13 +420,21 @@ function generarReporte(){
     const cobrosTransferencia = cobrosPeriodo
         .reduce((acc, p) => acc + (p.pago ? Number(p.pago.transferencia || 0) : 0), 0);
 
+    const cobrosTarjeta = cobrosPeriodo
+        .reduce((acc, p) => acc + (p.pago ? Number(p.pago.tarjeta || 0) : 0), 0);
+
     // Las ventas marcadas "DEBE" todavía no se cobraron: no cuentan
     // como plata real en Total Ventas / métodos de pago. (Los pagos que
     // se van cobrando después de una venta fiada se ven en el historial
     // de pagos de cada cliente, todavía no se suman acá al período).
     const ventasCobradas = ventas.filter(v => v.metodoPago !== "debe");
 
-    const totalVentas = ventasCobradas.reduce((acc, v) => acc + Number(v.total || 0), 0);
+    // El Total Ventas tiene que reflejar la plata real que entró en el
+    // período: las ventas cobradas directo, MÁS los cobros de deuda
+    // (fiados que se pagaron después), para que la caja cierre con el
+    // monto real disponible.
+    const totalVentas = ventasCobradas.reduce((acc, v) => acc + Number(v.total || 0), 0)
+        + totalCobrado;
 
     const totalGastos = gastosPeriodo.reduce((acc, g) => acc + Number(g.monto || 0), 0);
 
@@ -173,6 +447,9 @@ function generarReporte(){
     const ventasTransferencia = ventasCobradas
         .reduce((acc, v) => acc + Number((v.pago && v.pago.transferencia) || 0), 0);
 
+    const ventasTarjeta = ventasCobradas
+        .reduce((acc, v) => acc + Number((v.pago && v.pago.tarjeta) || 0), 0);
+
     const gastosEfectivo = gastosPeriodo
         .reduce((acc, g) => acc + (g.pago ? Number(g.pago.efectivo || 0) : Number(g.monto || 0)), 0);
 
@@ -182,6 +459,10 @@ function generarReporte(){
     const dineroEfectivo = ventasEfectivo + cobrosEfectivo - gastosEfectivo;
 
     const dineroTransferencia = ventasTransferencia + cobrosTransferencia - gastosTransferencia;
+
+    // No hay gastos pagados con tarjeta todavía en la app, pero se deja
+    // la resta preparada por si se agrega más adelante.
+    const dineroTarjeta = ventasTarjeta + cobrosTarjeta;
 
     const ventasMixtas = ventasCobradas.filter(v => v.metodoPago === "mixto").length;
 
@@ -219,88 +500,27 @@ function generarReporte(){
         .slice(0, 8);
 
     /* ==========================================
-       GANANCIA POR MAÍZ (solo bolsas, no suelto)
-       ------------------------------------------
-       Solo estos 3 productos exactos cuentan
-       (cualquier otro maíz —pisingallo, amarillo,
-       blanco, etc.— queda afuera), y solo cuando
-       se vendieron por bolsa entera, no sueltos
-       por kilo ni por monto en dinero.
+       RESERVAS POR PRODUCTO (ver negocio.js)
+       Solo se separa la plata que ya entró:
+       - ventas cobradas (PAGA) al momento;
+       - cobros de deudas (fiados), en proporción
+         a lo que el cliente pagó de esa venta.
+       Una venta DEBE no suma nada hasta que se cobra.
     ========================================== */
 
-    const GANANCIA_MAIZ_POR_BOLSA = {
+    const separar = {};
 
-        "MAIZX40KG": 11000,
-        "MAIZX45KG": 12000,
-        "MAIZX50KG": 12000
+    ventasCobradas.forEach(v => sumarSeparaciones(separar, calcularSeparacionVenta(v), 1));
 
-    };
+    cobrosPeriodo.forEach(p =>{
 
-    function normalizarNombreProducto(nombre){
+        const venta = historialVentas.find(v => v.id === p.ventaId);
 
-        return (nombre || "").toUpperCase().replace(/\s+/g, "");
+        if(!venta || !(Number(venta.total) > 0)) return;
 
-    }
+        const fraccion = Number(p.monto || 0) / Number(venta.total);
 
-    let gananciaMaiz = 0;
-    let bolsasMaizVendidas = 0;
-
-    ventas.forEach(v =>{
-
-        (v.productos || []).forEach(item =>{
-
-            if(item.modo !== "bolsa") return;
-
-            const clave = normalizarNombreProducto(item.nombre);
-
-            const gananciaPorBolsa = GANANCIA_MAIZ_POR_BOLSA[clave];
-
-            if(gananciaPorBolsa === undefined) return;
-
-            const cantidadBolsas = Number(item.cantidad || item.bolsas || 0);
-
-            gananciaMaiz += cantidadBolsas * gananciaPorBolsa;
-
-            bolsasMaizVendidas += cantidadBolsas;
-
-        });
-
-    });
-
-    /* ==========================================
-       SEPARAR ALFA
-       Se aparta $5.000 por cada bolsa de Alfa
-       Verde vendida, para reponer mercadería.
-    ========================================== */
-
-    const RESERVA_ALFA_POR_BOLSA = {
-
-        "ALFAVERDE": 5000
-
-    };
-
-    let reservaAlfa = 0;
-    let bolsasAlfaVendidas = 0;
-
-    ventas.forEach(v =>{
-
-        (v.productos || []).forEach(item =>{
-
-            if(item.modo !== "bolsa") return;
-
-            const clave = normalizarNombreProducto(item.nombre);
-
-            const reservaPorBolsa = RESERVA_ALFA_POR_BOLSA[clave];
-
-            if(reservaPorBolsa === undefined) return;
-
-            const cantidadBolsas = Number(item.cantidad || item.bolsas || 0);
-
-            reservaAlfa += cantidadBolsas * reservaPorBolsa;
-
-            bolsasAlfaVendidas += cantidadBolsas;
-
-        });
+        sumarSeparaciones(separar, calcularSeparacionVenta(venta), fraccion);
 
     });
 
@@ -315,7 +535,7 @@ function generarReporte(){
             <div class="cardMetrica">
                 <small>💰 Venta Total</small>
                 <h2>${dinero(totalVentas)}</h2>
-                <span class="subMetrica">${ventasCobradas.length} ventas</span>
+                <span class="subMetrica">${ventasCobradas.length} ventas + ${cobrosPeriodo.length} cobros de deuda</span>
             </div>
 
             <div class="cardMetrica">
@@ -337,16 +557,12 @@ function generarReporte(){
             </div>
 
             <div class="cardMetrica">
-                <small>🌿 Separar Alfa</small>
-                <h2>${dinero(reservaAlfa)}</h2>
-                <span class="subMetrica">${formatearStock(bolsasAlfaVendidas)} bolsas · $5.000 c/u</span>
+                <small>💳 Dinero en tarjeta</small>
+                <h2>${dinero(dineroTarjeta)}</h2>
+                <span class="subMetrica">ventas + cobros de deuda cobrados con tarjeta</span>
             </div>
 
-            <div class="cardMetrica">
-                <small>🌽 Separar Maíz</small>
-                <h2>${dinero(gananciaMaiz)}</h2>
-                <span class="subMetrica">${formatearStock(bolsasMaizVendidas)} bolsas (40/45/50kg)</span>
-            </div>
+            ${tarjetasReservasHTML(separar)}
 
         </div>
 
@@ -374,6 +590,14 @@ function generarReporte(){
 
                 <div class="ventaDashboard">
                     <div>
+                        <strong>Tarjeta</strong>
+                        <small>${ventas.filter(v => v.metodoPago === "tarjeta").length} ventas</small>
+                    </div>
+                    <span>${dinero(ventasTarjeta)}</span>
+                </div>
+
+                <div class="ventaDashboard">
+                    <div>
                         <strong>Mixto</strong>
                         <small>${ventasMixtas} ventas</small>
                     </div>
@@ -383,7 +607,7 @@ function generarReporte(){
                 <div class="ventaDashboard" style="border-top:2px dashed #eee;margin-top:8px;padding-top:14px">
                     <div>
                         <strong>💳 Cobros de deuda</strong>
-                        <small>${cobrosPeriodo.length} pagos de clientes (E: ${dinero(cobrosEfectivo)} · T: ${dinero(cobrosTransferencia)})</small>
+                        <small>${cobrosPeriodo.length} pagos de clientes (E: ${dinero(cobrosEfectivo)} · T: ${dinero(cobrosTransferencia)} · Tar: ${dinero(cobrosTarjeta)})</small>
                     </div>
                     <span>${dinero(totalCobrado)}</span>
                 </div>
