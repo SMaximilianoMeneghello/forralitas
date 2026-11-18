@@ -427,6 +427,7 @@ function renderEliminaciones(){
                     <td>${e.nombre} <small>(${e.usuario})</small></td>
                     <td>${e.tipo}</td>
                     <td>${e.detalle}</td>
+                    <td>${mjAccionesEliminacion(e)}</td>
                 </tr>
             `;
 
@@ -443,6 +444,8 @@ function renderEliminaciones(){
                 todo lo que las empleadas eliminan del sistema.
             </p>
 
+            ${mjBarraEliminaciones()}
+
             <div class="tablaEliminaciones">
 
                 <table>
@@ -453,6 +456,7 @@ function renderEliminaciones(){
                             <th>Usuario</th>
                             <th>Tipo</th>
                             <th>Detalle</th>
+                            <th>Acciones</th>
                         </tr>
                     </thead>
 

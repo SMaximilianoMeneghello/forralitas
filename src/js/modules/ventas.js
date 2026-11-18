@@ -677,12 +677,17 @@ function seleccionarClienteVenta(id){
 
     actualizarClienteVentaUI();
 
+    // Los productos ya cargados pasan a tener los precios de este cliente.
+    mjRecalcularCarritoConPrecios();
+
 }
 
 function limpiarClienteVenta(){
 
     clienteSeleccionado = null;
     actualizarClienteVentaUI();
+
+    mjRecalcularCarritoConPrecios();
 
 }
 
@@ -747,8 +752,10 @@ function obtenerPreciosProducto(producto){
     );
 
     return {
-        precioBolsa: especial?.precioBolsa ?? producto.precioBolsa,
-        precioKg: especial?.precioKg ?? producto.precioKg
+        // Un precio especial vacío o en $0 no se usa: va el de lista
+        // (antes ese producto se vendía a $0).
+        precioBolsa: Number(especial?.precioBolsa) > 0 ? especial.precioBolsa : producto.precioBolsa,
+        precioKg: Number(especial?.precioKg) > 0 ? especial.precioKg : producto.precioKg
     };
 
 }
@@ -1130,6 +1137,11 @@ function actualizarPreviewCantidad(){
 }
 
 function confirmarCantidad(){
+
+    // Se vuelve a buscar el producto: si mientras estaba abierto el cuadro
+    // llegó un cambio de otra PC, la lista se reemplazó y el descuento de
+    // stock tiene que hacerse sobre el registro actual (si no, se perdía).
+    if(productoVenta) productoVenta = productos.find(p => p.id === productoVenta.id) || null;
 
     if(!productoVenta){
 

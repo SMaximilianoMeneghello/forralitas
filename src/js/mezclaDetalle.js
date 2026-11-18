@@ -162,6 +162,7 @@ function renderHistorialProduccionMezcla(mezcla){
                 </div>
                 <div class="totalVentaHistorial">
                     +${formatearStock(p.cantidad)} bolsas de ${mezcla.productoSalida.nombre}
+                    ${mjAccionesProduccion(mezcla, p)}
                 </div>
             </div>
         `).join("");
@@ -325,7 +326,11 @@ function guardarProduccionMezcla(){
         fechaTexto: fechaHoraTexto(new Date()),
         cantidad,
         ingredientesUsados,
-        usuario: usuarioActual ? usuarioActual.nombre : null
+        usuario: usuarioActual ? usuarioActual.nombre : null,
+
+        // Lo que se movió de stock, para poder anularla (ver mejoras.js).
+        salidaId: mezcla.productoSalida.id,
+        consumo: detalle.map(det => ({ idProducto: det.producto.id, bolsas: det.bolsasADescontar }))
 
     });
 

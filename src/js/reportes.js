@@ -61,6 +61,8 @@ function renderReportes(){
                 : ""
             }
 
+            ${mjBarraCaja()}
+
             <div id="contenidoReporte"></div>
 
         </div>

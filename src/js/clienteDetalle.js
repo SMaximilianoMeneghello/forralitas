@@ -67,6 +67,7 @@ function renderClienteDetalle(id){
                             <span class="fechaVenta">🗓️ ${venta.fechaTexto}</span>
                             <span class="vendedorVenta">👤 ${vendedor}</span>
                         </div>
+                        ${mjAccionesVentaCliente(venta)}
                     </div>
                     <div class="datosVentaHistorial">
                         <span><strong>Pago:</strong> ${textoMetodoPago(venta)}</span>
@@ -123,6 +124,11 @@ function renderClienteDetalle(id){
                         <span class="valorDato ${saldoClass}">${dinero(cliente.saldo || 0)}</span>
                     </div>
 
+                    <div class="datoCliente">
+                        <span class="labelDato">Total comprado</span>
+                        <span class="valorDato">${dinero(mjTotalComprado(cliente.id))}</span>
+                    </div>
+
                     ${cliente.observaciones ? `
                         <div class="datoCliente">
                             <span class="labelDato">Observaciones</span>
@@ -142,6 +148,18 @@ function renderClienteDetalle(id){
                             id="btnPagarCliente"
                             class="btnRegistrarPago">
                             💵 Registrar pago
+                        </button>
+
+                        <button
+                            id="btnEstadoCuentaCliente"
+                            class="btnPrecios">
+                            🖨️ Estado de cuenta
+                        </button>
+
+                        <button
+                            id="btnEditarDatosCliente"
+                            class="btnPrecios">
+                            ✏️ Editar datos
                         </button>
 
                     </div>
@@ -208,6 +226,14 @@ function renderClienteDetalle(id){
     const btnPagar = document.getElementById("btnPagarCliente");
 
     if(btnPagar) btnPagar.onclick = ()=> abrirModalPagoCliente(cliente.id);
+
+    const btnEstadoCuenta = document.getElementById("btnEstadoCuentaCliente");
+
+    if(btnEstadoCuenta) btnEstadoCuenta.onclick = ()=> mjEstadoCuentaCliente(cliente.id);
+
+    const btnEditarDatos = document.getElementById("btnEditarDatosCliente");
+
+    if(btnEditarDatos) btnEditarDatos.onclick = ()=> editarCliente(cliente.id);
 
     const btnBuscar = document.getElementById("btnBuscarHistorialCliente");
 
@@ -312,6 +338,7 @@ function filtrarHistorialCliente(clienteId){
                         <span class="fechaVenta">🗓️ ${venta.fechaTexto}</span>
                         <span class="vendedorVenta">👤 ${vendedor}</span>
                     </div>
+                    ${mjAccionesVentaCliente(venta)}
                 </div>
                 <div class="datosVentaHistorial">
                     <span><strong>Pago:</strong> ${textoMetodoPago(venta)}</span>
@@ -344,6 +371,10 @@ function filtrarHistorialCliente(clienteId){
 
 function renderHistorialPagosCliente(cliente){
 
+    // Los pagos viejos no tenían identificador: se les asigna uno para
+    // poder editarlos o eliminarlos (ver mejoras.js).
+    if(mjAsegurarIdsPagos(cliente.pagos, "PG")) guardarDatos("clientes");
+
     const pagos = cliente.pagos || [];
 
     if(pagos.length === 0){
@@ -363,7 +394,9 @@ function renderHistorialPagosCliente(cliente){
                 <div class="detallePagoCliente">
                     <span>Aplicado a la venta del ${pago.ventaFechaTexto || "—"}</span>
                     <span>Le quedan ${dinero(pago.restanteVenta || 0)} de esa venta</span>
+                    <span>${mjTextoFormaPagoCliente(pago)}${pago.vendedor && pago.vendedor.nombre ? " · cobró " + pago.vendedor.nombre : ""}</span>
                 </div>
+                ${mjAccionesPagoCliente(cliente, pago)}
             </div>
         `).join("");
 

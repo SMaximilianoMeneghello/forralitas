@@ -73,6 +73,8 @@ function renderHistorial(){
 
             </div>
 
+            ${mjBarraHistorial()}
+
             <div id="listaHistorialVentas"></div>
 
         </div>
@@ -291,6 +293,9 @@ function renderListaHistorial(desde, hasta, texto = "", horaDesde = "", empleado
 
     }
 
+    // Filtro por forma de pago y totales (ver mejoras.js).
+    ventas = mjFiltrarYResumirHistorial(ventas);
+
     if(ventas.length === 0){
 
         cont.innerHTML = `
@@ -479,11 +484,17 @@ function eliminarVentaHistorial(id){
 
         "¿Eliminar la venta del "
         + (venta.fechaTexto || "fecha desconocida")
-        + " por " + dinero(venta.total) + "?",
+        + " por " + dinero(venta.total) + "? Se devuelve el stock"
+        + (mjPendienteReal(venta) > 0 ? " y se descuenta del saldo del cliente lo que debía de esta venta (" + dinero(mjPendienteReal(venta)) + ")" : "")
+        + ".",
 
         ()=>{
 
             historialVentas = historialVentas.filter(v => v.id !== id);
+
+            // Si era fiada, se descuenta del saldo del cliente lo que debía
+            // de esta venta y se quitan sus pagos (ver mejoras.js).
+            const deuda = mjQuitarDeudaDeVenta(venta);
 
             // Se devuelve al stock lo que se había descontado al cargar
             // cada producto de la venta (ver ventas.js > confirmarCantidad).
@@ -507,11 +518,19 @@ function eliminarVentaHistorial(id){
                 + ((venta.cliente && venta.cliente.nombre) ? venta.cliente.nombre : "Consumidor Final")
                 + " · " + dinero(venta.total),
 
-                venta
+                // Copia completa para poder restaurarla desde Eliminaciones.
+                {
+                    ...JSON.parse(JSON.stringify(venta)),
+                    stockDevuelto: true,
+                    saldoDescontado: deuda.saldoDescontado,
+                    pagosEliminados: deuda.pagosEliminados
+                }
 
             );
 
-            guardarDatos("historialVentas", "productos");
+            guardarDatos("historialVentas", "productos", "clientes");
+
+            mjRefrescarClienteYProductos();
 
             if(paginaActual === "Productos"){
 

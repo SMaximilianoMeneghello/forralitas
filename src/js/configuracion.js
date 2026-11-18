@@ -1486,23 +1486,8 @@ async function guardarConfigImpresora(){
 
 function exportarDatos(){
 
-    const datos = {
-
-        productos,
-
-        historialVentas,
-
-        clientes,
-
-        gastos,
-
-        proveedores,
-
-        usuarios,
-
-        configuracionSistema
-
-    };
+    // Copia con TODAS las tablas (ver mejoras.js).
+    const datos = mjDatosRespaldo();
 
     const blob = new Blob(
 
@@ -1516,7 +1501,7 @@ function exportarDatos(){
 
     a.href = URL.createObjectURL(blob);
 
-    a.download = "Backup_Forralitas.json";
+    a.download = "Backup_Forralitas_" + fechaLocalISO(new Date()) + ".json";
 
     a.click();
 
@@ -1546,6 +1531,20 @@ function importarDatos(){
 
                 const datos = JSON.parse(lector.result);
 
+                // Antes de reemplazar todo, se pide confirmación.
+                if(!lector.confirmado){
+
+                    confirmar(
+                        "Se van a REEMPLAZAR los datos actuales por los de la copia"
+                        + (datos.fecha ? " del " + fechaHoraTexto(datos.fecha) : "")
+                        + ". Lo cargado después de esa copia se pierde. ¿Continuar?",
+                        ()=>{ lector.confirmado = true; lector.onload(); }
+                    );
+
+                    return;
+
+                }
+
                 if(datos.productos) productos = ordenarProductosPorNombre(datos.productos);
 
                 if(datos.historialVentas) historialVentas = datos.historialVentas;
@@ -1557,6 +1556,22 @@ function importarDatos(){
                 if(datos.proveedores) proveedores = datos.proveedores;
 
                 if(datos.usuarios) usuarios = datos.usuarios;
+
+                if(Array.isArray(datos.mezclas)) mezclas = datos.mezclas;
+
+                if(Array.isArray(datos.carpetasNotas)) carpetasNotas = datos.carpetasNotas;
+
+                if(Array.isArray(datos.eliminaciones)) eliminaciones = datos.eliminaciones;
+
+                if(Array.isArray(datos.preciosClientes)) guardarTodosPreciosCliente(datos.preciosClientes);
+
+                if(Array.isArray(datos.historialIngresosProductos) && typeof historialIngresosProductos !== "undefined"){
+
+                    historialIngresosProductos = datos.historialIngresosProductos;
+
+                    guardarHistorialIngresosProductos();
+
+                }
 
                 if(datos.configuracionSistema){
 

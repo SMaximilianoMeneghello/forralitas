@@ -1,0 +1,173 @@
+/* ==========================================
+   MEJORAS 1.1.3
+   Archivo aparte: no modifica ningún estilo
+   existente, solo agrega lo de las funciones
+   nuevas, usando los colores del tema.
+========================================== */
+
+/* Barra con filtros, totales y exportar (Historial, Clientes,
+   Productos, Gastos, Caja, Eliminaciones). */
+.mjBarra{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:12px 20px;
+    background:var(--vidrio, #fff);
+    border:1px solid var(--vidrio-borde, rgba(0,0,0,.06));
+    border-radius:var(--radio, 14px);
+    padding:10px 16px;
+    margin:14px 0;
+}
+
+.mjBarra .btnCancelar{
+    margin-left:auto;
+    padding:10px 16px;
+}
+
+.mjBarraCaja .btnCancelar + .btnCancelar{
+    margin-left:0;
+}
+
+.mjBarra .grupoInput{
+    margin:0;
+    min-width:190px;
+}
+
+.mjBarra .grupoInput label{
+    display:block;
+    margin-bottom:4px;
+}
+
+.mjBarra .grupoInput select{
+    margin:0;
+}
+
+.mjResumen{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px 18px;
+    font-size:15px;
+}
+
+.mjCheck{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    cursor:pointer;
+    font-weight:600;
+    white-space:nowrap;
+}
+
+.mjCheck input{
+    width:auto !important;
+    margin:0 !important;
+}
+
+.mjNota{
+    font-size:13px;
+    opacity:.75;
+    margin-bottom:10px;
+}
+
+/* Botones chicos en ventas, pagos, compras y producciones. */
+.mjAccionesVenta{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    margin-left:auto;
+}
+
+.cabeceraVentaHistorial .mjAccionesVenta,
+.totalVentaHistorial .mjAccionesVenta{
+    margin-left:12px;
+}
+
+.mjAccionesPago{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    margin-top:8px;
+}
+
+.mjAccionesVenta .btnEditarVenta,
+.mjAccionesVenta .btnEliminarVenta,
+.mjAccionesPago .btnEditarVenta,
+.mjAccionesPago .btnEliminarVenta,
+.mjBtnIcono{
+    width:34px;
+    height:34px;
+    font-size:15px;
+    margin:0;
+}
+
+.mjBtnIcono{
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    background:rgba(128,128,128,.12);
+    transition:.25s;
+}
+
+.mjBtnIcono:hover{
+    transform:scale(1.08);
+}
+
+.mjDosCampos{
+    display:flex;
+    gap:8px;
+}
+
+/* ---------- Impresión (estado de cuenta y caja) ---------- */
+
+#mjZonaImpresion{
+    display:none;
+}
+
+@media print{
+
+    body.mjImprimiendo{
+        background:#fff !important;
+        overflow:visible !important;
+        height:auto !important;
+    }
+
+    body.mjImprimiendo > *:not(#mjZonaImpresion){
+        display:none !important;
+    }
+
+    body.mjImprimiendo #mjZonaImpresion{
+        display:block;
+        color:#000;
+        font-family:Arial, Helvetica, sans-serif;
+        font-size:13px;
+        line-height:1.4;
+    }
+
+    .mjHoja h1{ font-size:20px; margin:0 0 4px; }
+
+    .mjHoja h2{ font-size:17px; margin:10px 0 4px; }
+
+    .mjHoja h3{ font-size:14px; margin:16px 0 6px; }
+
+    .mjHoja table{
+        width:100%;
+        border-collapse:collapse;
+    }
+
+    .mjHoja th,
+    .mjHoja td{
+        border-bottom:1px solid #999;
+        padding:5px 6px;
+        text-align:left;
+        vertical-align:top;
+    }
+
+    .mjHoja .mjDerecha{ text-align:right; white-space:nowrap; }
+
+    .mjTotalHoja{
+        font-size:16px;
+        font-weight:bold;
+        margin-top:12px;
+    }
+
+}

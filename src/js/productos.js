@@ -42,6 +42,8 @@ function renderProductos(){
 
         </div>
 
+        ${mjBarraProductos()}
+
         <div class="card">
 
             <div class="tablaProductos">
@@ -115,12 +117,12 @@ function actualizarTablaProductos(){
 
     tbody.innerHTML = "";
 
-    const listaFiltrada = !filtroProductos
+    const listaFiltrada = mjFiltrarProductos(!filtroProductos
         ? productos
         : productos.filter(p =>
             (p.nombre || "").toLowerCase().includes(filtroProductos)
             || (p.categoria || "").toLowerCase().includes(filtroProductos)
-        );
+        ));
 
     if(productos.length === 0){
         tbody.innerHTML = `

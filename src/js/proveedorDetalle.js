@@ -22,6 +22,9 @@ function renderProveedorDetalle(id){
     if(!proveedor.compras) proveedor.compras = [];
     if(!proveedor.pagos) proveedor.pagos = [];
 
+    // Los pagos viejos no tenían identificador (ver mejoras.js).
+    if(mjAsegurarIdsPagos(proveedor.pagos, "PP")) guardarDatos("proveedores");
+
     document.getElementById("tituloProveedorDetalle").textContent = proveedor.nombre;
 
     const saldo = saldoPendienteProveedor(proveedor);
@@ -157,6 +160,7 @@ function renderHistorialComprasProveedor(proveedor){
                     </div>
                     <div class="totalVentaHistorial">
                         TOTAL: ${dinero(compra.monto)}
+                        ${mjAccionesCompra(proveedor, compra)}
                     </div>
                 </div>
             `;
@@ -187,6 +191,7 @@ function renderHistorialPagosProveedor(proveedor){
                     <span>Aplicado a: ${pago.compraDescripcion || "—"}</span>
                     <span>Quedan ${dinero(pago.restanteCompra || 0)} de esa compra</span>
                 </div>
+                ${mjAccionesPagoProveedor(proveedor, pago)}
             </div>
         `).join("") + `</div>`;
 

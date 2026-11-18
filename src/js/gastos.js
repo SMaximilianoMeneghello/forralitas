@@ -86,6 +86,8 @@ function renderGastos(){
 
         </div>
 
+        ${mjBarraGastos()}
+
         <div class="card">
 
             <div class="tablaGastos">
@@ -173,6 +175,8 @@ function buscarGastos(){
 }
 
 function actualizarTablaGastos(desde = null, hasta = null, texto = ""){
+
+    mjResumirGastos();
 
     const tbody = document.getElementById("tablaGastosBody");
 
